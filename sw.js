@@ -5,7 +5,7 @@
  * Rutas relativas a este archivo: funciona en la raíz y en /repo/ de GitHub Pages.
  */
 
-const CACHE = 'gym-v3';
+const CACHE = 'gym-v4';
 
 const ARCHIVOS = [
   './',
@@ -20,6 +20,7 @@ const ARCHIVOS = [
   './fonts/barlow-condensed-700.woff2',
   './js/app.js',
   './js/storage.js',
+  './js/planner.js',
   './js/data/exercises.js',
   './js/data/routines.js',
   './js/data/equipment.js',

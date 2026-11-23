@@ -2,7 +2,13 @@
  * Pantalla Ajustes / configuración inicial (#ajustes, se abre desde Hoy).
  * Edita la configuración del contrato de storage.js (pesos en gramos enteros)
  * e incluye exportar e importar datos en JSON.
+ * Al guardar mantiene la rutina al día (planner.js):
+ *  - cambia el número de días -> rutina nueva (con confirmación si ya había una);
+ *  - cambian solo los días o el nivel -> planner.reasignarDias, sin preguntar.
+ * En la configuración inicial, tras guardar, navega a Hoy.
  */
+
+import * as planner from '../planner.js';
 
 const DIAS = [
   [1, 'L', 'lunes'], [2, 'M', 'martes'], [3, 'X', 'miércoles'], [4, 'J', 'jueves'],
@@ -109,10 +115,17 @@ function pintar(contenedor, ctx) {
         <p class="screen__subtitle">${inicial ? 'Configuración inicial' : 'Tu equipo y tu semana'}</p>
         <h1 class="screen__title">Ajustes</h1>
       </div>
+      ${inicial ? '' : `
       <button type="button" class="screen__action btn btn--icon btn--ghost" data-accion="volver" aria-label="Cerrar ajustes">
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
+      </button>`}
     </header>
+
+    ${inicial ? `
+    <section class="card card--highlight stack" aria-label="Bienvenida">
+      <h2 class="card__title">Bienvenido a MicroApp Gym</h2>
+      <p class="card__meta">Elige cuántos días entrenas y cuáles, tu nivel y revisa tus discos. Al guardar se crea tu rutina.</p>
+    </section>` : ''}
 
     <form class="stack" novalidate>
       <section class="card stack" aria-label="Semana">
@@ -143,7 +156,7 @@ function pintar(contenedor, ctx) {
         <label class="row"><input type="checkbox" disabled> <span>Banco <span class="muted">(próximamente)</span></span></label>
       </section>
 
-      <button type="submit" class="btn btn--primary btn--block">Guardar ajustes</button>
+      <button type="submit" class="btn btn--primary btn--block">${inicial ? 'Crear mi rutina' : 'Guardar ajustes'}</button>
       <button type="button" class="btn btn--ghost btn--block" data-accion="restablecer">Volver a los valores estimados</button>
 
       <section class="card stack" aria-label="Copia de seguridad">
@@ -163,7 +176,7 @@ function conectar(contenedor, ctx) {
   const { storage } = ctx;
   const form = contenedor.querySelector('form');
 
-  contenedor.querySelector('[data-accion="volver"]').addEventListener('click', () => ctx.volver());
+  contenedor.querySelector('[data-accion="volver"]')?.addEventListener('click', () => ctx.volver());
 
   // Segmentados
   form.addEventListener('click', (evento) => {
@@ -222,15 +235,48 @@ function conectar(contenedor, ctx) {
       ctx.toast(`Te ${faltan === 1 ? 'falta' : 'faltan'} ${faltan} ${faltan === 1 ? 'día' : 'días'} por elegir.`);
       return;
     }
+    const anterior = storage.getConfig();
+    const eraInicial = anterior.configurado !== true;
     const aGuardar = { ...borrador, configurado: true };
     if (!aGuardar.fechaInicio) aGuardar.fechaInicio = fechaLocal(new Date());
-    if (storage.setConfig(aGuardar)) {
-      borrador = storage.getConfig();
-      ctx.toast('Ajustes guardados.');
-      pintar(contenedor, ctx);
-    } else {
-      ctx.toast('No se han podido guardar los ajustes.');
+    // Pasar a principiante desde Ajustes empieza un periodo de adaptación nuevo.
+    if (aGuardar.nivel === 'principiante' && storage.getConfig().nivel !== 'principiante') {
+      aGuardar.fechaInicio = fechaLocal(new Date());
     }
+
+    // ¿Había una rutina válida? Si el número de días cambia, se crea una nueva.
+    const rutinaPrevia = storage.get(storage.CLAVES.rutina, null);
+    const habiaRutina = Boolean(rutinaPrevia) && !planner.necesitaRegenerar(rutinaPrevia, anterior);
+    const regenerar = !habiaRutina || planner.necesitaRegenerar(rutinaPrevia, aGuardar);
+    if (habiaRutina && regenerar && !window.confirm(
+      'Cambiar el número de días crea una rutina nueva y se perderán los cambios que hiciste en ella. ¿Continuar?')) {
+      return;
+    }
+
+    if (!storage.setConfig(aGuardar)) {
+      ctx.toast('No se han podido guardar los ajustes.');
+      return;
+    }
+    const config = storage.getConfig();
+    let rutinaOk = true;
+    try {
+      if (regenerar) rutinaOk = ctx.guardarRutina(planner.generarRutina(config));
+      else rutinaOk = ctx.guardarRutina(planner.reasignarDias(rutinaPrevia, config));
+    } catch (e) {
+      console.error('[config] No se ha podido preparar la rutina', e);
+      rutinaOk = false;
+    }
+    if (!rutinaOk || !ctx.obtenerRutina()) {
+      ctx.toast('Ajustes guardados, pero no se ha podido crear la rutina.');
+    } else if (eraInicial) {
+      ctx.navegar('hoy');
+      ctx.toast('¡Rutina lista!');
+      return;
+    } else {
+      ctx.toast(regenerar && habiaRutina ? 'Ajustes guardados. Rutina nueva creada.' : 'Ajustes guardados.');
+    }
+    borrador = config;
+    pintar(contenedor, ctx);
   });
 
   contenedor.querySelector('[data-accion="restablecer"]').addEventListener('click', () => {

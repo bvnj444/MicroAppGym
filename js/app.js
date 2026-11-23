@@ -7,17 +7,34 @@
  * hash (#hoy, #rutina, #ejercicios, #historial, #ajustes), así que el botón
  * "atrás" de Android vuelve a la pantalla anterior.
  *
- * Cada vista exporta render(contenedor, ctx). ctx = {
+ * Cada vista exporta render(contenedor, ctx). render se vuelve a llamar CADA VEZ que
+ * se muestra la pantalla, así que debe leer los datos frescos (storage, ctx.config()...).
+ * ctx = {
  *   storage,               // módulo js/storage.js
  *   navegar(ruta),         // cambia de pantalla ('hoy', 'ajustes'...)
  *   volver(),              // atrás (o a Hoy si no hay historial dentro de la app)
- *   toast(mensaje),        // aviso breve
- *   kg(gramos)             // '10,75 kg'
+ *   toast(mensaje, ms?),   // aviso breve
+ *   kg(gramos),            // '10,75 kg'
+ *   hoy(),                 // 'AAAA-MM-DD' de hoy en hora local
+ *   config(),              // storage.getConfig()
+ *   obtenerRutina(),       // rutina guardada (CLAVES.rutina) lista para usar, o null:
+ *                          //  - configurado === false -> null
+ *                          //  - sin rutina o planner.necesitaRegenerar(rutina, config)
+ *                          //    -> planner.generarRutina(config), se guarda y se devuelve
+ *                          //  - días de la rutina distintos de config.diasSemana
+ *                          //    -> planner.reasignarDias(rutina, config), se guarda y se devuelve
+ *   guardarRutina(rutina), // la guarda en CLAVES.rutina; true | false
+ *   abrirEjercicio(id)     // va a Ejercicios y abre el detalle de ese ejercicio
+ *   ejercicioPendiente     // (interno) id que Ejercicios abre al pintarse; lo pone a null
  * }
+ *
+ * Arranque: si la configuración no está terminada (configurado === false) se abre
+ * Ajustes en modo "Configuración inicial"; la barra de pestañas sigue visible.
  */
 
 import * as storage from './storage.js';
 import { kg } from './data/equipment.js';
+import * as planner from './planner.js';
 import * as hoy from './views/hoy.js';
 import * as rutina from './views/rutina.js';
 import * as ejercicios from './views/ejercicios.js';
@@ -48,7 +65,59 @@ const ctx = {
   },
   toast: mostrarToast,
   kg, // un único formato de kg para toda la app (js/data/equipment.js)
+  hoy: fechaLocalHoy,
+  config: () => storage.getConfig(),
+  obtenerRutina,
+  guardarRutina,
+  ejercicioPendiente: null,
+  abrirEjercicio(id) {
+    ctx.ejercicioPendiente = id;
+    if (rutaActual === 'ejercicios') mostrar('ejercicios');
+    else ctx.navegar('ejercicios');
+  },
 };
+
+/* ---------- Fecha y rutina ---------- */
+
+function fechaLocalHoy() {
+  const f = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${f.getFullYear()}-${p(f.getMonth() + 1)}-${p(f.getDate())}`;
+}
+
+function guardarRutina(rutina) {
+  return storage.set(storage.CLAVES.rutina, rutina);
+}
+
+/** Días de la semana (ISO, ordenados) en los que cae la rutina. */
+function diasDeRutina(rutina) {
+  const dias = rutina.plantillaId === '3-dias'
+    ? (Array.isArray(rutina.huecos) ? rutina.huecos : [])
+    : rutina.dias.map((d) => d.diaSemana);
+  return [...dias].sort((a, b) => a - b);
+}
+
+function obtenerRutina() {
+  const config = storage.getConfig();
+  if (config.configurado !== true) return null;
+  let rutina = storage.get(storage.CLAVES.rutina, null);
+  try {
+    if (!rutina || planner.necesitaRegenerar(rutina, config)) {
+      rutina = planner.generarRutina(config);
+      guardarRutina(rutina);
+    } else {
+      const esperados = [...config.diasSemana].sort((a, b) => a - b).join();
+      if (diasDeRutina(rutina).join() !== esperados) {
+        rutina = planner.reasignarDias(rutina, config);
+        guardarRutina(rutina);
+      }
+    }
+  } catch (e) {
+    console.error('[app] No se ha podido preparar la rutina', e);
+    return null;
+  }
+  return rutina;
+}
 
 function rutaDesdeHash() {
   const ruta = decodeURIComponent(location.hash.replace(/^#\/?/, '')).trim();
@@ -62,6 +131,8 @@ function mostrar(ruta) {
     const activa = pantalla.dataset.pantalla === ruta;
     pantalla.classList.toggle('is-active', activa);
     pantalla.toggleAttribute('inert', !activa);
+    // Un panel (<dialog>) abierto no se queda encima al cambiar de pantalla.
+    if (!activa) for (const d of pantalla.querySelectorAll('dialog[open]')) d.close();
     if (activa) destino = pantalla;
   }
 
@@ -143,6 +214,16 @@ function registrarServiceWorker() {
 
 /* ---------- Arranque ---------- */
 
+/** Cuenta las aperturas de la app en CLAVES.meta (aperturas, ultimaApertura). */
+function registrarApertura() {
+  const meta = storage.get(storage.CLAVES.meta, {}) || {};
+  storage.set(storage.CLAVES.meta, {
+    ...meta,
+    ultimaApertura: new Date().toISOString(),
+    aperturas: (Number(meta.aperturas) || 0) + 1,
+  });
+}
+
 async function arrancar() {
   try {
     const estado = await storage.init();
@@ -152,6 +233,7 @@ async function arrancar() {
   } catch (e) {
     console.error('[app] Error al iniciar el guardado', e);
   }
+  registrarApertura();
 
   // Los enlaces de la barra navegan con pushState (sin recargar).
   document.querySelector('.tabbar')?.addEventListener('click', (evento) => {
@@ -173,7 +255,8 @@ async function arrancar() {
   window.addEventListener('popstate', alCambiarHistorial);
   window.addEventListener('hashchange', alCambiarHistorial);
 
-  const ruta = rutaDesdeHash();
+  // Primera vez: se abre Ajustes en modo "Configuración inicial".
+  const ruta = storage.getConfig().configurado === true ? rutaDesdeHash() : 'ajustes';
   if (location.hash !== '#' + ruta) history.replaceState(null, '', '#' + ruta);
   mostrar(ruta);
 }

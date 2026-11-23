@@ -1304,6 +1304,153 @@ label.row:has(> input:disabled) {
   100% { opacity: 0; transform: translate3d(var(--drift, 30px), 105vh, 0) rotate(var(--rot, 480deg)); }
 }
 
+/* ---------- 14a. Día elegido y notas ---------- */
+/* Día elegido en un selector de semana (por ejemplo, en Rutina). */
+.week__day.is-selected,
+.week__day[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  opacity: 1; /* también si es un día de descanso (atenuado) */
+}
+
+/* Nota informativa dentro de una pantalla (no es un aviso de acción). */
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-2);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.note strong {
+  color: var(--text);
+}
+
+/* Fila de chips con poca separación. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+/* Bloque compacto: columna con poca separación (secciones del detalle). */
+.stack--tight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Listas de texto numeradas (pasos de la técnica) o con viñetas. */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: 1.4em;
+  list-style: decimal;
+}
+
+.steps--bullets {
+  list-style: disc;
+}
+
+.steps > li::marker {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Elemento de lista no disponible (por ejemplo, necesita equipo que no hay). */
+.list__item.is-disabled {
+  opacity: 0.5;
+}
+
+/* ---------- 14b. Panel inferior (.sheet) ----------
+   Uso: <dialog class="sheet"> … </dialog>, abierto con dialog.showModal().
+   Partes: .sheet__handle (asa decorativa), .sheet__header, .sheet__title,
+   .sheet__body (con scroll), .sheet__footer (acciones fijas abajo).
+   Se cierra con el botón atrás de Android (evento cancel del <dialog>). */
+.sheet {
+  position: fixed;
+  inset: auto 0 0 0;
+  width: 100%;
+  max-width: var(--max-w, 480px);
+  max-height: 88dvh;
+  margin: 0 auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.sheet[open] {
+  display: flex;
+  flex-direction: column;
+  animation: sheet-entra var(--dur) var(--ease);
+}
+
+.sheet::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+@keyframes sheet-entra {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sheet__handle {
+  width: 40px;
+  height: 4px;
+  margin: var(--space-2) auto 0;
+  border-radius: 999px;
+  background: var(--border);
+  flex: none;
+}
+
+.sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  flex: none;
+}
+
+.sheet__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.sheet__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4) var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border);
+  flex: none;
+}
+
 /* ---------- 15. Movimiento reducido ---------- */
 @media (prefers-reduced-motion: reduce) {
   *,

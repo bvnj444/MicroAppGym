@@ -1,6 +1,6 @@
 # MicroApp Gym — Plan de implementación
 
-> Estado: **Fases 1 y 2 terminadas y revisadas por qa-movil. Publicada en https://bvnj444.github.io/MicroAppGym/. Siguiente: Fase 3 (planificador).**
+> Estado: **Fases 1, 2 y 3 terminadas y revisadas por qa-movil. Publicada en https://bvnj444.github.io/MicroAppGym/. Siguiente: Fase 4 (animaciones SVG).**
 > Última actualización: 23/11/2026 (revisión 2: correcciones de los subagentes experto-ejercicios, logica-entrenamiento y qa-movil)
 
 ---
