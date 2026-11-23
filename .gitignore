@@ -1,0 +1,13 @@
+# Herramientas ajenas a la app
+.antigravity/
+.claude/settings.local.json
+
+# Dependencias
+node_modules/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~

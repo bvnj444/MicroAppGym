@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>MicroApp Gym</title>
+  <rect width="512" height="512" rx="112.6" fill="#0F1115"/>
+  <g fill="#C6F432" transform="translate(256 256) rotate(-30)">
+    <rect x="-135.2" y="-18.4" width="270.3" height="36.9" rx="18.4"/>
+    <rect x="-119.8" y="-104.4" width="55.3" height="208.9" rx="18.4"/>
+    <rect x="64.5" y="-104.4" width="55.3" height="208.9" rx="18.4"/>
+    <rect x="-165.9" y="-73.7" width="43" height="147.5" rx="15.4"/>
+    <rect x="122.9" y="-73.7" width="43" height="147.5" rx="15.4"/>
+    <rect x="-191.7" y="-30.7" width="27" height="61.4" rx="9.2"/>
+    <rect x="164.7" y="-30.7" width="27" height="61.4" rx="9.2"/>
+  </g>
+</svg>

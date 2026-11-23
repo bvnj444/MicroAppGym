@@ -1,0 +1,1335 @@
+/* =====================================================================
+   MicroApp Gym — Sistema de diseño (css/styles.css)
+   Tema oscuro, móvil primero (360–430 px), sin recursos externos.
+   ---------------------------------------------------------------------
+   ÍNDICE DE COMPONENTES Y CLASES
+   0. Variables (:root) .... --bg --surface --surface-2 --border --text
+                             --text-muted --accent --accent-ink --accent-2
+                             --success --radius --radius-lg --space-1..6
+                             --tabbar-h --font-body --font-display --tap --ease
+   1. Fuentes .............. Inter 400/500/600/700, Barlow Condensed 600/700
+   2. Base ................. reset, foco visible, [hidden]
+   3. Estructura ........... .app .app__main .screen .screen.is-active
+                             .screen__header .screen__title .screen__subtitle
+                             .screen__action
+   4. Barra inferior ....... .tabbar .tabbar__item(.is-active) .tabbar__icon
+                             .tabbar__label
+   5. Tarjetas ............. .card .card--highlight .card__title .card__meta
+                             .card__body
+   6. Botones .............. .btn .btn--primary .btn--secondary .btn--ghost
+                             .btn--danger .btn--block .btn--icon
+   7. Series ............... .set-pills .set-pill(.is-current | .is-done)
+   8. Semana y datos ....... .week .week__day(.is-today | .is-done | .is-rest)
+                             .stat .stat__value .stat__label .streak
+   9. Listas y chips ....... .list .list__item .list__thumb .list__text
+                             .list__title .list__meta .chip .chip--barra
+                             .chip--mancuernas .chip--corporal
+   10. Avisos .............. .mount-alert .toast .empty-state
+   11. Cronómetro .......... .timer-bar .timer-ring .timer-ring__track
+                             .timer-ring__progress .timer__time
+                             .flash(.is-flashing)
+   12. Formularios ......... .field .field__label .field__input .segmented
+                             .segmented__option(.is-selected) .stepper
+                             (opcionales: .stepper__btn .stepper__value)
+   13. Utilidades .......... .stack .row .muted .accent .accent-2
+                             .visually-hidden
+   14. Confeti ............. .confetti .confetti__piece
+                             (variables por pieza: --x, --delay, --dur,
+                             --color, --drift, --rot)
+   15. Movimiento reducido . prefers-reduced-motion
+   ===================================================================== */
+
+/* ---------- 0. Variables ---------- */
+:root {
+  color-scheme: dark;
+
+  --bg: #0F1115;
+  --surface: #1A1D24;
+  --surface-2: #232731;
+  --border: #2C313C;
+  --text: #F2F4F7;
+  --text-muted: #9BA3B1;
+  --accent: #C6F432;
+  --accent-ink: #11140A;
+  --accent-2: #FF6B4A;
+  --success: #C6F432;
+
+  --accent-soft: rgba(198, 244, 50, 0.14);
+  --accent-2-soft: rgba(255, 107, 74, 0.14);
+
+  --radius: 14px;
+  --radius-lg: 22px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --tap: 56px;
+  --tabbar-h: 64px;
+  --timer-h: 72px;
+  --max-w: 430px;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur: 220ms;
+
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- 1. Fuentes (locales, woff2, subconjunto latin) ---------- */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/inter-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fonts/inter-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/inter-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/inter-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/barlow-condensed-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/barlow-condensed-700.woff2") format("woff2");
+}
+
+/* ---------- 2. Base ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+h1, h2, h3, h4, p, ul, ol, figure {
+  margin: 0;
+}
+
+ul, ol {
+  padding: 0;
+  list-style: none;
+}
+
+img, svg, video, canvas {
+  display: block;
+  max-width: 100%;
+}
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+a {
+  color: var(--accent);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* El foco que la app mueve al título al cambiar de pantalla (para lectores
+   de pantalla) no debe dibujar un recuadro. */
+[tabindex="-1"]:focus,
+[tabindex="-1"]:focus-visible {
+  outline: none;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ---------- 3. Estructura ---------- */
+.app {
+  position: relative;
+  width: 100%;
+  max-width: var(--max-w);
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding-top: var(--safe-top);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+  overflow-x: hidden;
+}
+
+.app__main {
+  padding: var(--space-4) var(--space-4)
+    calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-6));
+  overflow-x: hidden;
+}
+
+/* Con la franja del cronómetro visible se deja más hueco abajo */
+.app:has(.timer-bar:not([hidden])) .app__main {
+  padding-bottom: calc(var(--tabbar-h) + var(--timer-h) + var(--safe-bottom) + var(--space-6));
+}
+
+.screen {
+  display: none;
+}
+
+.screen.is-active {
+  display: block;
+  animation: screen-in 280ms var(--ease) both;
+}
+
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.screen__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-2) var(--space-5);
+}
+
+.screen__title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.screen__subtitle {
+  margin-top: var(--space-1);
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.screen__action {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin: -4px -8px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.screen__action:active {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.screen__action svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* ---------- 4. Barra inferior ---------- */
+.tabbar {
+  position: fixed;
+  z-index: 40;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: var(--max-w);
+  margin-inline: auto;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  height: calc(var(--tabbar-h) + var(--safe-bottom));
+  padding: 0 calc(var(--space-2) + var(--safe-right)) var(--safe-bottom) calc(var(--space-2) + var(--safe-left));
+  background: rgba(15, 17, 21, 0.92);
+  border-top: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.tabbar__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: var(--tap);
+  height: var(--tabbar-h);
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--dur) var(--ease);
+}
+
+.tabbar__item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 28px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--accent);
+  transform: translateX(-50%) scaleX(0);
+  transition: transform var(--dur) var(--ease);
+}
+
+.tabbar__item.is-active {
+  color: var(--accent);
+}
+
+.tabbar__item.is-active::before {
+  transform: translateX(-50%) scaleX(1);
+}
+
+.tabbar__item:focus-visible {
+  outline-offset: -4px;
+}
+
+.tabbar__icon {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  transition: transform var(--dur) var(--ease-bounce);
+}
+
+.tabbar__item.is-active .tabbar__icon {
+  transform: translateY(-1px) scale(1.08);
+}
+
+.tabbar__item:active .tabbar__icon {
+  transform: scale(0.9);
+}
+
+.tabbar__label {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- 5. Tarjetas ---------- */
+.card {
+  position: relative;
+  display: block;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+}
+
+.card + .card {
+  margin-top: var(--space-3);
+}
+
+.card--highlight {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(160deg, rgba(198, 244, 50, 0.12), rgba(198, 244, 50, 0) 55%) padding-box,
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(135deg, var(--accent), rgba(198, 244, 50, 0.25) 45%, var(--accent-2)) border-box;
+  box-shadow: 0 10px 30px rgba(198, 244, 50, 0.08);
+}
+
+.card__title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.card__meta {
+  margin-top: var(--space-1);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.card__body {
+  margin-top: var(--space-3);
+}
+
+/* ---------- 6. Botones ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: 0 var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    transform 120ms var(--ease),
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    opacity var(--dur) var(--ease);
+}
+
+.btn svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.btn--primary:active {
+  background: #B3DE22;
+}
+
+.btn--primary:focus-visible {
+  outline-color: var(--text);
+}
+
+.btn--secondary {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn--secondary:active {
+  background: var(--surface-2);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text);
+}
+
+.btn--ghost:active {
+  background: var(--surface-2);
+}
+
+.btn--danger {
+  background: var(--accent-2);
+  color: #1A0B06;
+  font-weight: 700;
+}
+
+.btn--danger:focus-visible {
+  outline-color: var(--text);
+}
+
+.btn--block {
+  display: flex;
+  width: 100%;
+}
+
+.btn--icon {
+  width: var(--tap);
+  min-width: 48px;
+  padding: 0;
+  flex: none;
+}
+
+/* ---------- 7. Series (pastillas) ---------- */
+.set-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.set-pill {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.set-pill.is-current {
+  border-color: var(--accent);
+  color: var(--accent);
+  animation: pill-pulse 1.6s ease-in-out infinite;
+}
+
+.set-pill.is-done {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: transparent;
+  animation: pill-bounce 480ms var(--ease-bounce);
+}
+
+/* Check dibujado con CSS */
+.set-pill.is-done::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 20px;
+  border: solid var(--accent-ink);
+  border-width: 0 3.5px 3.5px 0;
+  border-radius: 1px;
+  transform: translate(-50%, -62%) rotate(45deg);
+  animation: check-in 320ms 120ms var(--ease) both;
+}
+
+@keyframes pill-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(198, 244, 50, 0.45); }
+  50%      { box-shadow: 0 0 0 7px rgba(198, 244, 50, 0); }
+}
+
+@keyframes pill-bounce {
+  0%   { transform: scale(0.6); }
+  55%  { transform: scale(1.18); }
+  75%  { transform: scale(0.94); }
+  100% { transform: scale(1); }
+}
+
+@keyframes check-in {
+  from { opacity: 0; transform: translate(-50%, -62%) rotate(45deg) scale(0.3); }
+  to   { opacity: 1; transform: translate(-50%, -62%) rotate(45deg) scale(1); }
+}
+
+/* ---------- 8. Semana y datos ---------- */
+.week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.week__day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--tap);
+  padding: var(--space-2) 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.week__day strong,
+.week__day b {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.week__day.is-today {
+  border: 2px solid var(--accent);
+  color: var(--accent);
+}
+
+.week__day.is-done {
+  background: var(--accent-soft);
+  border-color: rgba(198, 244, 50, 0.4);
+  color: var(--accent);
+}
+
+.week__day.is-done::after {
+  content: "";
+  position: absolute;
+  bottom: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.week__day.is-rest {
+  background: transparent;
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.week__day.is-rest strong,
+.week__day.is-rest b {
+  color: var(--text-muted);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stat__value {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.stat__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.streak {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
+  border-radius: 999px;
+  max-width: 100%;
+  background: var(--accent-2-soft);
+  color: var(--accent-2);
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* El número de la racha, si va en <strong> o <b>, se muestra grande. */
+.streak > strong,
+.streak > b {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Icono de llama (SVG en línea, sin recursos externos) */
+.streak::before {
+  content: "";
+  width: 22px;
+  height: 22px;
+  flex: none;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2c.6 3.2-1 5.3-2.6 7.2C7.9 11 6.5 12.7 6.5 15.2A5.5 5.5 0 0 0 12 21a5.5 5.5 0 0 0 5.5-5.8c-.1-2.3-1.2-4-2.5-5.2.1 1.5-.4 2.8-1.6 3.4.3-3.3-.7-7.1-1.4-11.4zM12 21c-1.7 0-3-1.2-3-2.9 0-1.5 1-2.4 2-3.4.3 1 .9 1.5 1.6 1.7.2-.8.5-1.4 1-2 .9 1 1.4 2.2 1.4 3.4 0 1.8-1.3 3.2-3 3.2z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2c.6 3.2-1 5.3-2.6 7.2C7.9 11 6.5 12.7 6.5 15.2A5.5 5.5 0 0 0 12 21a5.5 5.5 0 0 0 5.5-5.8c-.1-2.3-1.2-4-2.5-5.2.1 1.5-.4 2.8-1.6 3.4.3-3.3-.7-7.1-1.4-11.4zM12 21c-1.7 0-3-1.2-3-2.9 0-1.5 1-2.4 2-3.4.3 1 .9 1.5 1.6 1.7.2-.8.5-1.4 1-2 .9 1 1.4 2.2 1.4 3.4 0 1.8-1.3 3.2-3 3.2z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* ---------- 9. Listas y chips ---------- */
+.list {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.list__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  transition: background-color var(--dur) var(--ease);
+}
+
+.list__item + .list__item {
+  border-top: 1px solid var(--border);
+}
+
+button.list__item:active,
+a.list__item:active,
+.list__item[role="button"]:active {
+  background: var(--surface-2);
+}
+
+.list__item:focus-visible {
+  outline-offset: -3px;
+}
+
+.list__thumb {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.list__thumb svg,
+.list__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.list__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.list__title {
+  overflow: hidden;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.list__meta {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.chip--barra {
+  background: rgba(96, 165, 250, 0.14);
+  border-color: rgba(96, 165, 250, 0.35);
+  color: #93C5FD;
+}
+
+.chip--mancuernas {
+  background: rgba(192, 132, 252, 0.14);
+  border-color: rgba(192, 132, 252, 0.35);
+  color: #D8B4FE;
+}
+
+.chip--corporal {
+  background: rgba(45, 212, 191, 0.14);
+  border-color: rgba(45, 212, 191, 0.35);
+  color: #5EEAD4;
+}
+
+/* ---------- 10. Avisos ---------- */
+.mount-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgba(198, 244, 50, 0.45);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Icono de disco */
+.mount-alert::before {
+  content: "";
+  width: 28px;
+  height: 28px;
+  flex: none;
+  background: var(--accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='5'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='black'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='5'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='black'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.mount-alert strong,
+.mount-alert b {
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 1.3em;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.toast {
+  position: fixed;
+  z-index: 60;
+  left: calc(var(--space-4) + var(--safe-left));
+  right: calc(var(--space-4) + var(--safe-right));
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-3));
+  max-width: calc(var(--max-w) - 2 * var(--space-4));
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 500;
+  box-shadow: var(--shadow);
+  animation: toast-in 260ms var(--ease) both;
+}
+
+.app:has(.timer-bar:not([hidden])) .toast,
+body:has(.timer-bar:not([hidden])) .toast {
+  bottom: calc(var(--tabbar-h) + var(--timer-h) + var(--safe-bottom) + var(--space-3));
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty-state svg {
+  width: 64px;
+  height: 64px;
+  color: var(--border);
+  margin-bottom: var(--space-2);
+}
+
+.empty-state h2,
+.empty-state h3,
+.empty-state strong {
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.empty-state p {
+  max-width: 30ch;
+  font-size: 0.95rem;
+}
+
+/* ---------- 11. Cronómetro (solo estilos base) ---------- */
+.timer-bar {
+  position: fixed;
+  z-index: 45;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom));
+  max-width: var(--max-w);
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--timer-h);
+  padding: var(--space-2) calc(var(--space-4) + var(--safe-right)) var(--space-2) calc(var(--space-4) + var(--safe-left));
+  background: var(--surface);
+  border-top: 2px solid var(--accent-2);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+  animation: toast-in 260ms var(--ease) both;
+}
+
+.timer-bar .timer-ring {
+  width: 52px;
+  height: 52px;
+}
+
+.timer-bar .timer__time {
+  font-size: 2.25rem;
+  flex: 1 1 auto;
+}
+
+.timer-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(72vw, 280px);
+  aspect-ratio: 1;
+  flex: none;
+}
+
+.timer-ring svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+
+.timer-ring__track {
+  fill: none;
+  stroke: var(--surface-2);
+  stroke-width: 8;
+}
+
+.timer-ring__progress {
+  fill: none;
+  stroke: var(--accent-2);
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear;
+}
+
+.timer__time {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 22vw, 6rem);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+.flash {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  background: var(--accent-2);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.flash.is-flashing {
+  animation: flash 1.5s ease-out both;
+}
+
+@keyframes flash {
+  0%   { opacity: 0; }
+  10%  { opacity: 0.85; }
+  25%  { opacity: 0.1; }
+  40%  { opacity: 0.85; }
+  55%  { opacity: 0.1; }
+  70%  { opacity: 0.7; }
+  100% { opacity: 0; }
+}
+
+/* ---------- 12. Formularios ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.field__input {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem; /* 16 px: evita el zoom automático en el móvil */
+  transition: border-color var(--dur) var(--ease);
+}
+
+.field__input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.field__input:focus,
+.field__input:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.segmented__option {
+  min-width: 0;
+  min-height: var(--tap);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.segmented__option.is-selected {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.segmented__option.is-selected:focus-visible {
+  outline-color: var(--text);
+}
+
+/* Selector de 6 o más opciones (días L…D): menos relleno para que cada botón
+   tenga al menos ~44 px de ancho a 360 px. */
+.segmented:has(> .segmented__option:nth-child(6)) {
+  gap: 2px;
+  padding: 2px;
+}
+
+.segmented:has(> .segmented__option:nth-child(6)) .segmented__option {
+  padding: 0;
+}
+
+/* Stepper dentro de un campo: ocupa todo el ancho y el valor se centra. */
+.field > .stepper {
+  display: flex;
+  width: 100%;
+}
+
+.field > .stepper > output,
+.field > .stepper > span,
+.field > .stepper > input {
+  flex: 1;
+}
+
+/* Casillas de verificación dentro de una fila: sin saltar de línea y con
+   tamaño táctil. */
+label.row {
+  flex-wrap: nowrap;
+  min-height: var(--tap);
+  cursor: pointer;
+}
+
+label.row > input[type="checkbox"] {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+label.row:has(> input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: var(--tap);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.stepper > button,
+.stepper__btn {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  min-height: var(--tap);
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1;
+  transition: background-color var(--dur) var(--ease);
+}
+
+.stepper > button:active,
+.stepper__btn:active {
+  background: var(--surface-2);
+}
+
+.stepper > button:focus-visible,
+.stepper__btn:focus-visible {
+  outline-offset: -3px;
+}
+
+.stepper > output,
+.stepper > span,
+.stepper > input,
+.stepper__value {
+  display: grid;
+  place-items: center;
+  min-width: 84px;
+  width: auto;
+  white-space: nowrap;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-inline: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.stepper > input::-webkit-outer-spin-button,
+.stepper > input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stepper > input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ---------- 13. Utilidades ---------- */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.accent {
+  color: var(--accent);
+}
+
+.accent-2 {
+  color: var(--accent-2);
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* ---------- 14. Confeti ----------
+   El JS crea cada .confetti__piece con variables en línea, por ejemplo:
+   style="--x: 37%; --delay: 120ms; --dur: 2600ms; --color: #C6F432;
+          --drift: -40px; --rot: 540deg" */
+.confetti {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti__piece {
+  position: absolute;
+  top: -20px;
+  left: var(--x, 50%);
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--color, var(--accent));
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: confetti-fall var(--dur, 2600ms) var(--delay, 0ms) cubic-bezier(0.25, 0.6, 0.4, 1) forwards;
+}
+
+.confetti__piece:nth-child(3n) {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color, var(--accent-2));
+}
+
+.confetti__piece:nth-child(4n + 1) {
+  width: 6px;
+  height: 16px;
+  background: var(--color, #FFFFFF);
+}
+
+@keyframes confetti-fall {
+  0%   { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+  85%  { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--drift, 30px), 105vh, 0) rotate(var(--rot, 480deg)); }
+}
+
+/* ---------- 15. Movimiento reducido ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* La serie actual se marca con un anillo fijo en lugar de pulsar */
+  .set-pill.is-current {
+    box-shadow: 0 0 0 4px rgba(198, 244, 50, 0.3);
+  }
+
+  /* El destello sigue siendo un aviso visual, pero sin parpadeos */
+  .flash.is-flashing {
+    animation: flash-calm 1.2s linear both !important;
+    animation-duration: 1.2s !important;
+  }
+
+  /* Sin confeti en movimiento */
+  .confetti {
+    display: none;
+  }
+}
+
+@keyframes flash-calm {
+  0%   { opacity: 0; }
+  20%  { opacity: 0.6; }
+  100% { opacity: 0; }
+}
