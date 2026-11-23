@@ -26,6 +26,7 @@ Eres el programador de la lógica de entrenamiento de **MicroApp Gym**. Antes de
     - Si en 2 sesiones seguidas no se llega al mínimo, sugiere el peso montable anterior.
     - Si el equipo ya está al máximo, sugiere el siguiente escalón de `variantes`.
   - Cálculos para el historial: volumen por sesión y por ejercicio (los ejercicios unilaterales cuentan por lado) y mejores marcas.
+  - **Racha** (sección 9.8): racha actual y récord a partir de las sesiones terminadas, los días marcados y la fecha de hoy. Prueba los casos de días cumplidos, día fallado, descansos y entreno en un día no marcado.
 
 ## Archivos que te pertenecen
 `js/data/equipment.js`, `js/planner.js`

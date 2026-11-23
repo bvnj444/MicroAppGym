@@ -92,6 +92,14 @@ Microapp para móvil para planificar y seguir una rutina de gimnasio en casa ada
   - El tiempo se calcula con **marcas de hora** (`Date.now()`), no sumando intervalos, para que no se desfase si Chrome frena la página.
   - Si al volver a la app el descanso ya terminó, se muestra "Descanso terminado hace X s".
   - Además del sonido y la vibración, siempre hay un **aviso visual** (destello a pantalla completa).
+- **Notificaciones de racha (Android/Chrome, app instalada)** — ver sección 9.8:
+  - Se muestran con `ServiceWorkerRegistration.showNotification()` y se pide permiso solo cuando el usuario activa "Avisos de racha" en Ajustes.
+  - **Al terminar una sesión** (fiable): se muestran al momento.
+  - **Recordatorio en los días de entrenamiento** (sin servidor):
+    - Usa **Periodic Background Sync**, que está disponible en Chrome para Android con la app instalada.
+    - Es Chrome quien decide cuándo ejecutarlo (como mucho, más o menos una vez al día, según el uso de la app), así que **no llega a una hora exacta**.
+    - Como respaldo, el aviso también aparece al abrir la app ese día.
+  - **Mejora opcional futura (hora exacta):** Web Push con claves VAPID y un envío programado (por ejemplo, un flujo programado de GitHub Actions). Necesita guardar la suscripción del móvil fuera de él, por eso no entra en la primera versión.
 
 ---
 
@@ -346,6 +354,20 @@ Los 4 días anteriores más **Hombro y brazos** (sábado), todo con mancuernas:
    - Gráfica sencilla de progresión por ejercicio.
    - Mejores marcas.
 
+8. **Racha y notificaciones:**
+   - **Qué es la racha:** el número de entrenamientos seguidos que has cumplido en los días que marcaste en Ajustes.
+     - Un día marcado con la sesión terminada suma 1.
+     - Los días de descanso no suman ni la rompen.
+     - Si un día marcado termina sin sesión, la racha vuelve a 0.
+     - Entrenar en un día no marcado también suma (recuperar no se castiga).
+     - Se guarda también el **récord de racha**.
+   - **Dónde se ve:** en la tarjeta de racha de la pantalla Hoy ("🔥 7 entrenamientos seguidos sin fallar"), con el récord debajo.
+   - **Notificaciones** (se activan en Ajustes → "Avisos de racha"):
+     - Al terminar una sesión: "🔥 ¡Racha de 7! Próximo entrenamiento: jueves, Torso B".
+     - Los días de entrenamiento: "Hoy toca Pierna A. Llevas 7 seguidos, ¡no la pierdas! 🔥". Llega una vez a lo sumo y no aparece si ya has entrenado ese día.
+     - Al llegar a un hito (5, 10, 25, 50 y 100): una notificación especial.
+     - Tocar la notificación abre la app en la pantalla Hoy.
+
 Navegación: barra inferior con las pestañas **Hoy**, **Rutina**, **Ejercicios** e **Historial**. Ajustes se abre desde un icono en la pantalla Hoy.
 
 ---
@@ -437,15 +459,19 @@ Cada fase termina con una revisión de **qa-movil**. Una fase solo está termina
 - El descanso arranca solo después de cada serie.
 - Al cerrar la app a mitad de la sesión y volver a abrirla, se retoma en la misma serie.
 
-### Fase 7 — Historial y progresión
+### Fase 7 — Historial, progresión, racha y notificaciones
 - Lista de sesiones, volumen y pesos usados.
 - Gráfica por ejercicio y mejores marcas.
 - Sugerencias de doble progresión y escalera de variantes.
+- **Racha real** calculada con las sesiones y los días marcados (sección 9.8), con récord.
+- **Notificaciones de racha:** interruptor en Ajustes, aviso al terminar la sesión, recordatorio en los días de entrenamiento con Periodic Background Sync y aviso de hitos.
 
 **Terminado cuando:**
 - Con todas las series en el máximo del rango, la sugerencia es el siguiente peso montable.
 - Con el peso al máximo, la sugerencia es el siguiente escalón de la escalera.
 - El volumen coincide con un cálculo hecho a mano.
+- La racha da el resultado correcto en pruebas con semanas inventadas: días cumplidos, un día fallado, días de descanso y entrenar en un día no marcado.
+- En el Android, al terminar una sesión llega la notificación de racha, y tocarla abre la app en Hoy.
 
 ### Fase 8 — Pruebas y pulido
 - Instalación limpia en el Android.
@@ -467,4 +493,6 @@ Cada fase termina con una revisión de **qa-movil**. Una fase solo está termina
 - [x] **Publicación: GitHub Pages** para el uso diario y reenvío de puertos por USB durante el desarrollo.
 - [x] **Objetivo fijo: hipertrofia.** No se pregunta en la configuración.
 - [x] **Inicio del desarrollo (Fase 1):** hecho en local (23/11/2026). El usuario tiene cuenta de GitHub.
-- [ ] **Publicación en GitHub Pages:** pendiente de la confirmación del usuario (el repositorio será público).
+- [x] **Publicación en GitHub Pages:** confirmada. El código está en `github.com/bvnj444/MicroAppGym`, con el correo privado de GitHub en los commits.
+- [ ] **Activar GitHub Pages** en los ajustes del repositorio (lo hace el usuario): *Settings → Pages → Deploy from a branch → `main` / `(root)`*.
+- [x] **Notificaciones de racha:** sí, sin servidor (al terminar la sesión y recordatorio aproximado con Periodic Background Sync). La hora exacta con Web Push queda como mejora opcional.

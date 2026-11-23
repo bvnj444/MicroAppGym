@@ -12,6 +12,11 @@ Eres el arquitecto de la PWA de **MicroApp Gym**. Antes de empezar, lee siempre 
 - **Service worker:** `sw.js` con caché **versionada**. Mantén actualizada su lista de archivos cada vez que aparezca uno nuevo.
 - **Navegación:** barra inferior (Hoy, Rutina, Ejercicios, Historial) y transiciones sin recargar la página.
 - **Guardado:** `storage.js` con esquema versionado y migraciones, `navigator.storage.persist()`, recuperación si los datos están corruptos y exportar/importar en JSON.
+- **Notificaciones de racha** (Fase 7, secciones 3 y 9.8):
+  - Interruptor "Avisos de racha" en Ajustes, que pide el permiso.
+  - `showNotification` desde el service worker, con `notificationclick` que abre la app en `#hoy`.
+  - Recordatorio en los días de entrenamiento con Periodic Background Sync, si está disponible, y aviso al abrir la app como respaldo.
+  - La racha la calcula `logica-entrenamiento`.
 - **Pantallas:** `js/views/config.js` (configuración inicial y ajustes), `js/views/hoy.js`, `js/views/ejercicios.js` (catálogo y detalle) y `js/views/historial.js`. Usan las funciones que exponen los demás módulos.
 - **Pruebas en el móvil Android:**
   - Durante el desarrollo, servidor local y depuración USB con reenvío de puertos (`chrome://inspect`), para que el móvil abra `localhost`.

@@ -1114,6 +1114,11 @@ body:has(.timer-bar:not([hidden])) .toast {
   padding: 0;
 }
 
+/* Opción que no se puede elegir ahora (por ejemplo, ya hay bastantes días). */
+.segmented__option[aria-disabled="true"] {
+  opacity: 0.35;
+}
+
 /* Stepper dentro de un campo: ocupa todo el ancho y el valor se centra. */
 .field > .stepper {
   display: flex;

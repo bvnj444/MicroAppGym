@@ -28,7 +28,32 @@ const PASOS = [
   ] },
 ];
 
+// Días recomendados para cada número de días por semana (1 = lunes … 7 = domingo).
+// Coinciden con la semana tipo del PLAN (sección 7).
+const DIAS_RECOMENDADOS = { 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 4, 5, 6] };
+
 let borrador = null; // copia de trabajo de la configuración mientras se edita
+
+/**
+ * Ajusta la selección de días a `n` días: conserva los que ya estaban marcados
+ * (por orden de la semana), quita los que sobran y completa con los días
+ * recomendados y, si hace falta, con el resto de la semana.
+ */
+function ajustarDias(dias, n) {
+  const elegidos = [...new Set(dias)].sort((a, b) => a - b).slice(0, n);
+  const candidatos = [...DIAS_RECOMENDADOS[n], 1, 2, 3, 4, 5, 6, 7];
+  for (const d of candidatos) {
+    if (elegidos.length >= n) break;
+    if (!elegidos.includes(d)) elegidos.push(d);
+  }
+  return elegidos.sort((a, b) => a - b);
+}
+
+function textoEleccionDias(c) {
+  const faltan = c.diasPorSemana - c.diasSemana.length;
+  if (faltan > 0) return `Qué días (elige ${faltan} más)`;
+  return `Qué días (${c.diasPorSemana} de ${c.diasPorSemana} elegidos)`;
+}
 
 function leer(obj, ruta) { return ruta.reduce((o, k) => (o == null ? undefined : o[k]), obj); }
 function escribir(obj, ruta, valor) {
@@ -46,6 +71,7 @@ function segmentado({ id, etiqueta, opciones, multiple }) {
         ${opciones.map((o) => `
           <button type="button" class="segmented__option${o.elegida ? ' is-selected' : ''}" data-valor="${o.valor}"
             ${multiple ? `aria-pressed="${o.elegida}"` : `role="radio" aria-checked="${o.elegida}"`}
+            ${o.bloqueada ? 'aria-disabled="true"' : ''}
             ${o.titulo ? `aria-label="${o.titulo}"` : ''}>${o.texto}</button>`).join('')}
       </div>
     </div>`;
@@ -93,8 +119,13 @@ function pintar(contenedor, ctx) {
         <h2 class="card__title">Semana</h2>
         ${segmentado({ id: 'cfg-dias-semana-n', etiqueta: 'Días por semana', opciones:
           [3, 4, 5].map((n) => ({ valor: n, texto: String(n), elegida: c.diasPorSemana === n })) })}
-        ${segmentado({ id: 'cfg-dias', etiqueta: `Qué días (elige ${c.diasPorSemana})`, multiple: true, opciones:
-          DIAS.map(([n, letra, nombre]) => ({ valor: n, texto: letra, titulo: nombre, elegida: c.diasSemana.includes(n) })) })}
+        ${segmentado({ id: 'cfg-dias', etiqueta: textoEleccionDias(c), multiple: true, opciones:
+          DIAS.map(([n, letra, nombre]) => {
+            const elegida = c.diasSemana.includes(n);
+            // Con todos los días ya elegidos, los demás no se pueden marcar hasta quitar uno.
+            const bloqueada = !elegida && c.diasSemana.length >= c.diasPorSemana;
+            return { valor: n, texto: letra, titulo: nombre, elegida, bloqueada };
+          }) })}
         ${segmentado({ id: 'cfg-nivel', etiqueta: 'Nivel', opciones: [
           { valor: 'principiante', texto: 'Principiante', elegida: c.nivel === 'principiante' },
           { valor: 'intermedio', texto: 'Intermedio', elegida: c.nivel === 'intermedio' },
@@ -141,11 +172,26 @@ function conectar(contenedor, ctx) {
     const grupo = opcion.closest('[data-grupo]').dataset.grupo;
     const valor = opcion.dataset.valor;
     if (grupo === 'cfg-dias-semana-n') {
+      const anterior = borrador.diasPorSemana;
       borrador.diasPorSemana = Number(valor);
+      // Si se usaban los días recomendados, se pasa a los recomendados del nuevo número
+      // (así 3 días queda L-X-V, con descanso entre medias). Si el usuario los había
+      // personalizado, se conservan sus días y solo se quitan o añaden los necesarios.
+      const eranRecomendados = DIAS_RECOMENDADOS[anterior]?.join() === [...borrador.diasSemana].sort((a, b) => a - b).join();
+      borrador.diasSemana = eranRecomendados
+        ? [...DIAS_RECOMENDADOS[borrador.diasPorSemana]]
+        : ajustarDias(borrador.diasSemana, borrador.diasPorSemana);
     } else if (grupo === 'cfg-dias') {
       const n = Number(valor);
       const dias = new Set(borrador.diasSemana);
-      if (dias.has(n)) dias.delete(n); else dias.add(n);
+      if (dias.has(n)) {
+        dias.delete(n);
+      } else if (dias.size >= borrador.diasPorSemana) {
+        ctx.toast(`Ya tienes ${borrador.diasPorSemana} días. Quita uno antes de elegir otro.`);
+        return;
+      } else {
+        dias.add(n);
+      }
       borrador.diasSemana = [...dias].sort((a, b) => a - b);
     } else if (grupo === 'cfg-nivel') {
       borrador.nivel = valor;
@@ -172,7 +218,8 @@ function conectar(contenedor, ctx) {
   form.addEventListener('submit', (evento) => {
     evento.preventDefault();
     if (borrador.diasSemana.length !== borrador.diasPorSemana) {
-      ctx.toast(`Elige exactamente ${borrador.diasPorSemana} días de la semana.`);
+      const faltan = borrador.diasPorSemana - borrador.diasSemana.length;
+      ctx.toast(`Te ${faltan === 1 ? 'falta' : 'faltan'} ${faltan} ${faltan === 1 ? 'día' : 'días'} por elegir.`);
       return;
     }
     const aGuardar = { ...borrador, configurado: true };
