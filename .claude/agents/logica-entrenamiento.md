@@ -19,6 +19,7 @@ Eres el programador de la lógica de entrenamiento de **MicroApp Gym**. Antes de
   - Función que devuelve **todos los pesos montables** para cada montaje.
 - `js/planner.js`:
   - Genera la rutina semanal a partir de la configuración (días y nivel) usando `routines.js` y `exercises.js`. El nivel principiante resta 1 serie las 2 primeras semanas y suma 30 s de descanso.
+  - **Copia profunda** (`structuredClone`) de las plantillas antes de modificarlas: `PLANTILLAS['4-dias']` y `['5-dias']` comparten los mismos objetos de día.
   - Filtra los ejercicios que el equipo no permite y ofrece los `sustitutos` del ejercicio.
   - Permite ajustar las series, las repeticiones y el peso.
   - **Doble progresión** (sección 7):

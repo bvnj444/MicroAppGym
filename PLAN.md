@@ -1,6 +1,6 @@
 # MicroApp Gym — Plan de implementación
 
-> Estado: **Fase 1 terminada en local y revisada por qa-movil. Falta publicarla en GitHub Pages y probarla en el Android.**
+> Estado: **Fases 1 y 2 terminadas y revisadas por qa-movil. Publicada en https://bvnj444.github.io/MicroAppGym/. Siguiente: Fase 3 (planificador).**
 > Última actualización: 23/11/2026 (revisión 2: correcciones de los subagentes experto-ejercicios, logica-entrenamiento y qa-movil)
 
 ---
@@ -179,15 +179,15 @@ Todos los pesos se guardan **en gramos enteros** (1,25 kg = 1250) para evitar er
 
 | Grupo | Mancuernas | Barra | Peso corporal |
 |---|---|---|---|
-| Pecho | Press de suelo, aperturas en suelo, press squeeze | Press de suelo con barra | Lagartijas, lagartijas declinadas (pies en silla) |
+| Pecho | Press de suelo, aperturas en suelo, press squeeze | Press de suelo con barra | Flexiones, flexiones declinadas (pies en silla) |
 | Espalda | Remo a una mano, remo inclinado con dos mancuernas, pullover en suelo, remo renegado *(opcional, con aviso: las mancuernas redondas ruedan)* | Remo con barra | Remo invertido bajo mesa *(opcional, con aviso de seguridad)* |
-| Hombro | Press militar, elevaciones laterales, pájaros | Press militar de pie | Lagartijas pike |
+| Hombro | Press militar, elevaciones laterales, pájaros | Press militar de pie | Flexiones pike |
 | Pierna | Sentadilla goblet, zancadas hacia atrás, sentadilla búlgara, peso muerto a una pierna, hip thrust a una pierna | Peso muerto rumano, hip thrust (hombros en el sofá) | Elevación de talones a una pierna, puente de glúteo, puente de glúteo a una pierna |
 | Brazos | Curl martillo, curl concentrado, extensión de tríceps sobre la cabeza | Curl con barra, press francés en suelo | Fondos en silla |
 | Core | — | — | Plancha, elevación de piernas, crunch |
 
 - **"Con pausa" y "con bajada lenta"** no son ejercicios aparte: son modificadores (`tempo` y `pausa`) de un ejercicio del catálogo. Por ejemplo, la "sentadilla goblet con pausa" es la sentadilla goblet con `pausa: 2`.
-- **Sustitutos y regresiones:** el press squeeze, las lagartijas, las lagartijas pike, el crunch, el puente de glúteo y el remo invertido no están en la rutina por defecto. Aparecen como alternativas al cambiar un ejercicio, y el crunch se alterna con la elevación de piernas.
+- **Sustitutos y regresiones:** el press squeeze, las flexiones, las flexiones pike, el crunch, el puente de glúteo y el remo invertido no están en la rutina por defecto. Aparecen como alternativas al cambiar un ejercicio, y el crunch se alterna con la elevación de piernas.
 - **Excluidos por el equipo actual:** dominadas y fondos en paralelas. Se activarán si en la configuración se marca "barra de dominadas".
 
 ---
@@ -237,7 +237,7 @@ Cada día va **ordenado por montaje**. Dentro del bloque de barra, los ejercicio
 | 4 | 2 mancuernas | Elevaciones laterales | 4 × 12-20 | 60 s |
 | 5 | 2 mancuernas | Pájaros (deltoide posterior) | 3 × 15-20 | 60 s |
 | 6 | 2 mancuernas + — | Superserie: curl martillo 3 × 10-12 + fondos en silla 3 × 10-15 | — | 75 s tras cada pareja |
-| 7 | — | Lagartijas declinadas (pies en silla) | 2 × casi al fallo | 90 s |
+| 7 | — | Flexiones declinadas (pies en silla) | 2 × casi al fallo | 90 s |
 
 **Pierna B** (barra → mancuernas → peso corporal)
 
@@ -279,9 +279,11 @@ Los 4 días anteriores más **Hombro y brazos** (sábado), todo con mancuernas:
 
 ### 3 días: cuerpo completo A / B / A (la semana siguiente B / A / B)
 
+Se entrena **lunes, miércoles y viernes**. Los descansos son los mismos que en la rutina de 4 días para cada ejercicio (120 s en los básicos, 90 s en los unilaterales y 60-75 s en el aislamiento y el core).
+
 | Cuerpo completo A | Cuerpo completo B |
 |---|---|
-| **Barra:** press de suelo 3×8-12, remo 3×8-12, peso muerto rumano 3×10-12 | **Barra:** hip thrust 3×12-15 |
+| **Barra:** peso muerto rumano 3×10-12, press de suelo 3×8-12, remo 3×8-12 | **Barra:** hip thrust 3×12-15 |
 | **Mancuernas:** sentadilla goblet 3×12-15, elevaciones laterales 3×12-20 | **Mancuernas:** press de suelo 3×10-15, remo a una mano 3×10-12, sentadilla búlgara 3×10-12, superserie curl martillo + fondos en silla 2×12 |
 | **Peso corporal:** plancha 3×30-45 s | **Peso corporal:** elevación de talones a una pierna 3×15-20 |
 
@@ -299,9 +301,11 @@ Los 4 días anteriores más **Hombro y brazos** (sábado), todo con mancuernas:
 | Peso muerto rumano con barra | Bajada en 3 s → peso muerto a una pierna |
 | Remo con barra o con mancuerna | Pausa de 2 s arriba → bajada en 3 s |
 | Press de suelo | Bajada en 3 s → pausa de 1 s con los codos en el suelo |
-| Lagartijas | Declinadas → declinadas con pausa abajo |
+| Flexiones | Declinadas → declinadas con pausa abajo |
 | Elevación de talones a una pierna | Con una mancuerna en la mano → pausa de 2 s abajo |
-| Ejercicios de aislamiento (curl, elevaciones, pájaros, aperturas) | Bajada en 3 s → subir el rango a 15-20 |
+| Curl y aperturas | Bajada en 3 s → subir el rango a 15-20 |
+| Elevaciones laterales y pájaros (ya trabajan a 12-20) | Bajada en 3 s → subir el rango a 20-25 |
+| Plancha | Subir a 45-60 s → con un disco sobre la espalda |
 
 ---
 

@@ -17,6 +17,7 @@
  */
 
 import * as storage from './storage.js';
+import { kg } from './data/equipment.js';
 import * as hoy from './views/hoy.js';
 import * as rutina from './views/rutina.js';
 import * as ejercicios from './views/ejercicios.js';
@@ -28,8 +29,6 @@ const PESTANAS = ['hoy', 'rutina', 'ejercicios', 'historial'];
 const RUTA_INICIAL = 'hoy';
 
 let rutaActual = null;
-
-const formatoKg = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
 
 const ctx = {
   storage,
@@ -48,9 +47,7 @@ const ctx = {
     }
   },
   toast: mostrarToast,
-  kg(gramos) {
-    return `${formatoKg.format((Number(gramos) || 0) / 1000)} kg`;
-  },
+  kg, // un único formato de kg para toda la app (js/data/equipment.js)
 };
 
 function rutaDesdeHash() {
