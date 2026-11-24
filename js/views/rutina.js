@@ -16,6 +16,7 @@ import * as planner from '../planner.js';
 import { EJERCICIOS } from '../data/exercises.js';
 import { htmlFigura, pausarFiguras } from '../animations.js';
 import { calcularMontaje, cambiosMontaje, textoMontaje, textoCambios } from '../data/equipment.js';
+import { desbloquearAudio, iniciarDescanso, iniciarLibre } from '../timer.js';
 
 const POR_ID = new Map(EJERCICIOS.map((e) => [e.id, e]));
 const LETRAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -381,7 +382,20 @@ function abrirPanel(contenedor, ctx, diaId, indice, ajustePrincipiante) {
         <button type="button" class="btn btn--primary btn--block" data-accion="guardar">Guardar</button>
         <button type="button" class="btn btn--secondary btn--block" data-accion="cambiar">Cambiar ejercicio</button>
         <button type="button" class="btn btn--ghost btn--block" data-accion="tecnica">Ver técnica</button>
+        <button type="button" class="btn btn--secondary btn--block" data-accion="probar">${textoProbar()}</button>
       </footer>`;
+  };
+
+  // Prueba del cronómetro (Fase 5) con los valores que se ven en el panel.
+  const segundosLibre = () => (rangoVisible ? b.max : (item.segundos || [30, 45])[1]);
+  const textoProbar = () => (esTiempo ? `▶ Cronómetro (${segundosLibre()} s)` : `▶ Probar descanso (${b.descanso} s)`);
+  const probar = () => {
+    desbloquearAudio(); // dentro del toque: desbloquea el sonido
+    const nombre = nombreEj(item.ejercicioId);
+    if (esTiempo) iniciarLibre(segundosLibre(), { etiqueta: nombre });
+    else iniciarDescanso(b.descanso, { etiqueta: 'Descanso', siguiente: nombre });
+    // Igual que "Guardar": guarda los cambios pendientes (si los hay) y cierra el panel.
+    guardar();
   };
 
   const pintarCambio = () => {
@@ -450,12 +464,15 @@ function abrirPanel(contenedor, ctx, diaId, indice, ajustePrincipiante) {
         const out = panel.querySelector(`[data-valor="${campo}"]`);
         if (out) out.textContent = b[campo] + (campo === 'descanso' ? ' s' : campo === 'series' ? '' : unidad);
       }
+      const botonProbar = panel.querySelector('[data-accion="probar"]');
+      if (botonProbar) botonProbar.textContent = textoProbar();
     } else if (boton.dataset.peso) {
       iPeso = limitar(iPeso + Number(boton.dataset.peso), 0, pesos.length - 1);
       pintarAjuste();
       panel.querySelector(`[data-peso="${boton.dataset.peso}"]`)?.focus();
     } else if (accion === 'guardar') guardar();
     else if (accion === 'cerrar') cerrarPanel();
+    else if (accion === 'probar') probar();
     else if (accion === 'cambiar') pintarCambio();
     else if (accion === 'volver') pintarAjuste();
     else if (accion === 'tecnica') { cerrarPanel(); ctx.abrirEjercicio(item.ejercicioId); }

@@ -25,14 +25,16 @@
                              .list__title .list__meta .chip .chip--barra
                              .chip--mancuernas .chip--corporal
    10. Avisos .............. .mount-alert .toast .empty-state
-   11. Cronómetro .......... .timer-bar .timer-ring .timer-ring__track
-                             .timer-ring__progress .timer__time
-                             .flash(.is-flashing)
+   11. Cronómetro .......... .timer(.is-expanded | .is-warning | .is-done
+                             | .is-free | .is-prep) .timer__ring .timer__track
+                             .timer__progress .timer__time .timer__info
+                             .timer__label .timer__next .timer__actions
+                             .timer__btn body.has-timer .flash(.is-on)
    12. Formularios ......... .field .field__label .field__input .segmented
                              .segmented__option(.is-selected) .stepper
                              (opcionales: .stepper__btn .stepper__value)
    13. Utilidades .......... .stack .row .muted .accent .accent-2
-                             .visually-hidden
+                             .visually-hidden .sr-only
    14. Confeti ............. .confetti .confetti__piece
                              (variables por pieza: --x, --delay, --dur,
                              --color, --drift, --rot)
@@ -69,7 +71,7 @@
 
   --tap: 56px;
   --tabbar-h: 64px;
-  --timer-h: 72px;
+  --timer-h: 160px; /* alto de la franja .timer (anillo + botones) */
   --max-w: 430px;
 
   --safe-top: env(safe-area-inset-top, 0px);
@@ -232,11 +234,6 @@ a {
   padding: var(--space-4) var(--space-4)
     calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-6));
   overflow-x: hidden;
-}
-
-/* Con la franja del cronómetro visible se deja más hueco abajo */
-.app:has(.timer-bar:not([hidden])) .app__main {
-  padding-bottom: calc(var(--tabbar-h) + var(--timer-h) + var(--safe-bottom) + var(--space-6));
 }
 
 .screen {
@@ -895,11 +892,6 @@ a.list__item:active,
   animation: toast-in 260ms var(--ease) both;
 }
 
-.app:has(.timer-bar:not([hidden])) .toast,
-body:has(.timer-bar:not([hidden])) .toast {
-  bottom: calc(var(--tabbar-h) + var(--timer-h) + var(--safe-bottom) + var(--space-3));
-}
-
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: none; }
@@ -936,8 +928,27 @@ body:has(.timer-bar:not([hidden])) .toast {
   font-size: 0.95rem;
 }
 
-/* ---------- 11. Cronómetro (solo estilos base) ---------- */
-.timer-bar {
+/* ---------- 11. Cronómetro de descanso ----------
+   Marcado (js/timer.js, se añade directamente a <body>):
+     section.timer[hidden]
+       button.timer__ring > svg > circle.timer__track + circle.timer__progress
+                          + span.timer__time
+       div.timer__info > span.timer__label + span.timer__next
+       div.timer__actions > button.btn.timer__btn[data-timer] x3
+       p.sr-only[aria-live]
+     div.flash
+   Estados en .timer: .is-expanded (pantalla completa), .is-warning (<= 10 s),
+   .is-done (terminado, cuenta hacia arriba), .is-free (cronómetro libre),
+   .is-prep (preparación 3-2-1). body.has-timer mientras la franja se ve.
+   El JS actualiza stroke-dashoffset (0 lleno .. 100 vacío) en cada frame:
+   aquí NO hay transición sobre esa propiedad. */
+.timer {
+  --ring-size: 64px;
+  --ring-stroke: 10;
+  --timer-tone: var(--accent-2);      /* color de la etiqueta y del borde */
+  --timer-progress: var(--accent);    /* color del arco de progreso */
+  --timer-digits: var(--text);        /* color de las cifras */
+
   position: fixed;
   z-index: 45;
   left: 0;
@@ -945,90 +956,347 @@ body:has(.timer-bar:not([hidden])) .toast {
   bottom: calc(var(--tabbar-h) + var(--safe-bottom));
   max-width: var(--max-w);
   margin-inline: auto;
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--ring-size) minmax(0, 1fr);
+  grid-template-areas:
+    "ring    info"
+    "actions actions";
   align-items: center;
-  gap: var(--space-3);
-  min-height: var(--timer-h);
-  padding: var(--space-2) calc(var(--space-4) + var(--safe-right)) var(--space-2) calc(var(--space-4) + var(--safe-left));
+  column-gap: var(--space-3);
+  row-gap: var(--space-3);
+  padding: var(--space-3) calc(var(--space-4) + var(--safe-right)) var(--space-3) calc(var(--space-4) + var(--safe-left));
   background: var(--surface);
-  border-top: 2px solid var(--accent-2);
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
-  animation: toast-in 260ms var(--ease) both;
+  border-top: 2px solid var(--timer-tone);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.45);
+  /* Entrada con transición + @starting-style: solo se dispara al aparecer
+     (de [hidden] a visible), no al reducir desde el modo ampliado. */
+  transition: opacity 320ms var(--ease), transform 320ms var(--ease);
 }
 
-.timer-bar .timer-ring {
-  width: 52px;
-  height: 52px;
+@starting-style {
+  .timer {
+    opacity: 0;
+    transform: translateY(100%);
+  }
 }
 
-.timer-bar .timer__time {
-  font-size: 2.25rem;
-  flex: 1 1 auto;
+/* [hidden] ya es display:none !important en la base; se repite por claridad */
+.timer[hidden] {
+  display: none !important;
 }
 
-.timer-ring {
+
+/* Hueco para que la franja no tape el contenido ni los avisos */
+body.has-timer .app__main {
+  padding-bottom: calc(var(--tabbar-h) + var(--timer-h) + var(--safe-bottom) + var(--space-6));
+}
+
+body.has-timer .toast {
+  bottom: calc(var(--tabbar-h) + var(--timer-h) + var(--safe-bottom) + var(--space-3));
+}
+
+/* Anillo (botón que amplía / reduce) */
+.timer__ring {
+  grid-area: ring;
   position: relative;
   display: grid;
   place-items: center;
-  width: min(72vw, 280px);
-  aspect-ratio: 1;
-  flex: none;
+  width: var(--ring-size);
+  height: var(--ring-size);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--timer-digits);
+  justify-self: center;
 }
 
-.timer-ring svg {
+.timer__ring:focus-visible {
+  outline-offset: 4px;
+  border-radius: 50%;
+}
+
+.timer__ring svg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  transform: rotate(-90deg);
   overflow: visible;
+  transform: rotate(-90deg); /* empieza arriba; avanza en sentido horario */
 }
 
-.timer-ring__track {
+.timer__track,
+.timer__progress {
   fill: none;
+  stroke-width: var(--ring-stroke);
+}
+
+.timer__track {
   stroke: var(--surface-2);
-  stroke-width: 8;
 }
 
-.timer-ring__progress {
-  fill: none;
-  stroke: var(--accent-2);
-  stroke-width: 8;
+.timer__progress {
+  stroke: var(--timer-progress);
   stroke-linecap: round;
-  transition: stroke-dashoffset 1s linear;
+  transition: stroke 300ms var(--ease); /* solo el color, nunca el dashoffset */
 }
 
 .timer__time {
   position: relative;
   font-family: var(--font-display);
-  font-size: clamp(4rem, 22vw, 6rem);
+  font-size: 1.375rem;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
-  color: var(--text);
+  color: var(--timer-digits);
+  white-space: nowrap;
+  transition: color 300ms var(--ease);
 }
 
+/* Etiqueta y siguiente ejercicio */
+.timer__info {
+  grid-area: info;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.timer__label {
+  align-self: flex-start;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--timer-tone);
+  transition: color 300ms var(--ease), background-color 300ms var(--ease);
+}
+
+.timer__next {
+  max-width: 100%;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timer__next:empty {
+  display: none;
+}
+
+/* Fila de botones: −15 s | +15 s | Saltar */
+.timer__actions {
+  grid-area: actions;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.timer__btn {
+  min-width: 0;
+  padding-inline: var(--space-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.timer__btn.btn--ghost {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+.timer__btn.btn--ghost:active {
+  background: var(--border);
+}
+
+/* --- Expandido: pantalla completa, por encima de la barra de pestañas --- */
+.timer.is-expanded {
+  --ring-size: min(70vmin, 340px);
+  --ring-stroke: 7;
+
+  z-index: 70;
+  inset: 0;
+  max-width: none;
+  grid-template-columns: minmax(0, 1fr);
+  /* Anillo + etiqueta centrados en vertical; botones abajo (pulgar) */
+  grid-template-rows: minmax(0, 1fr) auto auto minmax(var(--space-4), 1fr) auto;
+  grid-template-areas:
+    "."
+    "ring"
+    "info"
+    "."
+    "actions";
+  row-gap: var(--space-4);
+  padding:
+    calc(var(--space-6) + var(--safe-top))
+    calc(var(--space-4) + var(--safe-right))
+    calc(var(--space-5) + var(--safe-bottom))
+    calc(var(--space-4) + var(--safe-left));
+  background: var(--bg);
+  border-top: 0;
+  border-radius: 0;
+  box-shadow: none;
+  animation: timer-expand 280ms var(--ease) both;
+}
+
+/* Contenido centrado y limitado a 430 px en pantallas anchas */
+.timer.is-expanded > .timer__info,
+.timer.is-expanded > .timer__actions {
+  width: 100%;
+  max-width: calc(var(--max-w) - 2 * var(--space-4));
+  justify-self: center;
+}
+
+.timer.is-expanded .timer__ring {
+  align-self: center;
+}
+
+.timer.is-expanded .timer__time {
+  font-size: clamp(4rem, 22vmin, 7.5rem);
+}
+
+.timer.is-expanded .timer__info {
+  align-items: center;
+  text-align: center;
+  gap: var(--space-1);
+}
+
+.timer.is-expanded .timer__label {
+  align-self: center;
+  font-size: 0.9375rem;
+}
+
+.timer.is-expanded .timer__next {
+  font-size: 1.125rem;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.timer.is-expanded .timer__next:empty {
+  display: none;
+}
+
+.timer.is-expanded .timer__btn {
+  min-height: 64px;
+  font-size: 1.125rem;
+}
+
+/* Sin scroll del fondo mientras está a pantalla completa */
+body.has-timer:has(.timer.is-expanded:not([hidden])) {
+  overflow: hidden;
+}
+
+@keyframes timer-expand {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- Estados --- */
+/* Últimos 10 s: arco y cifras en coral */
+.timer.is-warning {
+  --timer-progress: var(--accent-2);
+  --timer-digits: var(--accent-2);
+}
+
+/* Terminado: arco lleno, etiqueta resaltada y pulsación suave */
+.timer.is-done {
+  --timer-tone: var(--accent);
+  --timer-progress: var(--accent);
+  --timer-digits: var(--accent);
+}
+
+.timer.is-done .timer__progress {
+  stroke-dashoffset: 0 !important;
+}
+
+.timer.is-done .timer__label {
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.timer.is-done .timer__ring {
+  animation: timer-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+
+/* Cronómetro libre (plancha, etc.): tono lima con punto en la etiqueta */
+.timer.is-free {
+  --timer-tone: var(--accent);
+}
+
+.timer.is-free .timer__label::before {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  margin-right: 0.45em;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 0.1em;
+}
+
+/* Preparación 3-2-1: arco y etiqueta en blanco, cifra muy grande */
+.timer.is-prep {
+  --timer-tone: var(--text);
+  --timer-progress: var(--text);
+}
+
+.timer.is-prep .timer__time {
+  font-size: 2rem;
+}
+
+.timer.is-expanded.is-prep .timer__time {
+  font-size: clamp(7rem, 40vmin, 12rem);
+}
+
+/* --- Destello de fin de descanso (pantalla completa) --- */
 .flash {
   position: fixed;
   z-index: 100;
   inset: 0;
-  background: var(--accent-2);
+  background: var(--accent);
   opacity: 0;
   pointer-events: none;
 }
 
-.flash.is-flashing {
-  animation: flash 1.5s ease-out both;
+.flash.is-on {
+  animation: flash 1.2s ease-out both;
 }
 
+/* Como popover (capa superior, por encima de un <dialog> abierto): anula los
+   estilos del navegador para que cubra toda la pantalla. */
+.flash:popover-open {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: var(--accent);
+}
+
+/* Dos destellos en 1,2 s */
 @keyframes flash {
   0%   { opacity: 0; }
-  10%  { opacity: 0.85; }
-  25%  { opacity: 0.1; }
-  40%  { opacity: 0.85; }
-  55%  { opacity: 0.1; }
-  70%  { opacity: 0.7; }
+  12%  { opacity: 0.75; }
+  35%  { opacity: 0.08; }
+  55%  { opacity: 0.75; }
   100% { opacity: 0; }
 }
 
@@ -1247,7 +1515,8 @@ label.row:has(> input:disabled) {
   color: var(--accent-2);
 }
 
-.visually-hidden {
+.visually-hidden,
+.sr-only {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
@@ -1489,9 +1758,15 @@ label.row:has(> input:disabled) {
   }
 
   /* El destello sigue siendo un aviso visual, pero sin parpadeos */
-  .flash.is-flashing {
-    animation: flash-calm 1.2s linear both !important;
+  .flash.is-on {
+    animation: flash-calm 1.2s ease-in-out both !important;
     animation-duration: 1.2s !important;
+  }
+
+  /* Cronómetro: sin deslizamientos ni pulsación; el estado se ve por color */
+  .timer.is-done .timer__ring {
+    animation: none !important;
+    transform: none;
   }
 
   /* Sin confeti en movimiento */
@@ -1500,8 +1775,9 @@ label.row:has(> input:disabled) {
   }
 }
 
+/* Un único fundido suave, sin parpadeo */
 @keyframes flash-calm {
   0%   { opacity: 0; }
-  20%  { opacity: 0.6; }
+  30%  { opacity: 0.55; }
   100% { opacity: 0; }
 }

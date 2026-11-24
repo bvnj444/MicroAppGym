@@ -21,6 +21,8 @@
  *   CLAVES.sesiones      -> 'mag:sesiones'       Array de registros de sesión terminados
  *   CLAVES.sesionActiva  -> 'mag:sesionActiva'   Registro de sesión a medias (o null)
  *   CLAVES.meta          -> 'mag:meta'           Datos internos (aperturas, etc.)
+ *   'mag:cronometro'     Estado temporal del cronómetro (timer.js): finEn absoluto, modo, etc.
+ *                        No está en CLAVES: no se exporta ni se importa y se borra al cerrarlo.
  *   Copias de datos corruptos: 'mag:corrupto:<clave>:<marca de tiempo>' (texto tal cual).
  *   Cada valor se guarda envuelto: { "v": <versión del esquema>, "d": <dato> }.
  *
