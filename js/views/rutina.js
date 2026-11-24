@@ -14,6 +14,7 @@
 
 import * as planner from '../planner.js';
 import { EJERCICIOS } from '../data/exercises.js';
+import { htmlFigura, pausarFiguras } from '../animations.js';
 import { calcularMontaje, cambiosMontaje, textoMontaje, textoCambios } from '../data/equipment.js';
 
 const POR_ID = new Map(EJERCICIOS.map((e) => [e.id, e]));
@@ -22,16 +23,12 @@ const NOMBRES_DIA = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sáb
 const ETIQUETA_MONTAJE = { barra: 'Barra', mancuernas: 'Mancuernas', ninguno: 'Peso corporal' };
 const CLASE_CHIP = { barra: 'chip--barra', mancuernas: 'chip--mancuernas', ninguno: 'chip--corporal' };
 
-const MINIATURA = `
-  <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="24" cy="10" r="4"/>
-    <path d="M24 14v14M24 28l-7 12M24 28l7 12M12 20h24"/>
-  </svg>`;
-
 // Día elegido mientras la app esté abierta.
 let fechaElegida = null;
 // Panel abierto (para cerrarlo si se vuelve a pintar la pantalla).
 let panelAbierto = null;
+// Pantalla cuyas miniaturas se pausan mientras el panel la tapa.
+let fondoPausado = null;
 
 /* ---------- Utilidades ---------- */
 
@@ -158,7 +155,7 @@ function pintarEjercicio(item, i, ctx, superserie) {
   if (superserie) chips.push(`<span class="chip">Superserie ${superserie}</span>`);
   return `
     <button type="button" class="list__item" data-indice="${i}">
-      <span class="list__thumb">${MINIATURA}</span>
+      <span class="list__thumb" aria-hidden="true">${htmlFigura(item.ejercicioId, { tamano: 'mini' })}</span>
       <span class="list__text">
         <span class="list__title">${esc(nombreEj(item.ejercicioId))}</span>
         <span class="list__meta">${esc(textoMeta(item, ctx))}</span>
@@ -292,6 +289,10 @@ function cerrarPanel() {
     if (p.open) p.close();
     p.remove();
   }
+  if (fondoPausado) {
+    pausarFiguras(fondoPausado, false);
+    fondoPausado = null;
+  }
 }
 
 const limitar = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -346,6 +347,8 @@ function abrirPanel(contenedor, ctx, diaId, indice, ajustePrincipiante) {
   panel.className = 'sheet';
   panel.setAttribute('aria-labelledby', 'sheet-titulo');
   panelAbierto = panel;
+  fondoPausado = contenedor;
+  pausarFiguras(contenedor, true);
 
   const pintarAjuste = () => {
     const pesoHtml = pesos.length ? `
@@ -386,7 +389,7 @@ function abrirPanel(contenedor, ctx, diaId, indice, ajustePrincipiante) {
     const lista = subs.length
       ? `<div class="list">${subs.map((s) => `
           <button type="button" class="list__item" data-sustituto="${esc(s.id)}">
-            <span class="list__thumb">${MINIATURA}</span>
+            <span class="list__thumb" aria-hidden="true">${htmlFigura(s.id, { tamano: 'mini', animada: false })}</span>
             <span class="list__text">
               <span class="list__title">${esc(s.nombre)}</span>
               <span class="list__meta">${esc(textoEquipo(s))}${s.apoyo ? ' · ' + esc(s.apoyo) : ''}</span>

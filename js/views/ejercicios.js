@@ -3,10 +3,12 @@
  * muscular y por equipo. Al tocar un ejercicio se abre su detalle en un panel
  * inferior <dialog class="sheet">. El botón atrás de Android lo cierra (evento
  * cancel del dialog); no se usa el historial, así que no afecta a las pestañas.
- * La animación llega en la Fase 4 (de momento, un marcador de posición).
+ * Cada ejercicio muestra su figura SVG (js/animations.js): miniatura estática en
+ * la lista y animación grande en bucle con el mapa de músculos en el detalle.
  */
 
 import { EJERCICIOS, GRUPOS, MUSCULOS } from '../data/exercises.js';
+import { htmlFigura, htmlMapaMusculos } from '../animations.js';
 
 const POR_ID = new Map(EJERCICIOS.map((e) => [e.id, e]));
 const NOMBRE_GRUPO = Object.fromEntries(GRUPOS.map((g) => [g.id, g.nombre]));
@@ -28,12 +30,6 @@ const CHIP_EQUIPO = {
   'peso corporal': ['chip--corporal', 'Peso corporal'],
 };
 const NOMBRE_REQUISITO = { barraDominadas: 'barra de dominadas', banco: 'banco' };
-
-const MINIATURA = `
-  <svg viewBox="0 0 48 48" width="48" height="48" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="24" cy="10" r="4"/>
-    <path d="M24 14v14M24 28l-7 12M24 28l7 12M12 20h24"/>
-  </svg>`;
 
 const ICONO_CERRAR = `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
 
@@ -77,7 +73,7 @@ function pintarLista(lista) {
     return `
     <li>
       <button type="button" class="list__item${requisito ? ' is-disabled' : ''}" data-id="${esc(e.id)}">
-        <span class="list__thumb">${MINIATURA}</span>
+        <span class="list__thumb" aria-hidden="true">${htmlFigura(e.id, { tamano: 'mini', animada: false })}</span>
         <span class="list__text">
           <span class="list__title">${esc(e.nombre)}</span>
           <span class="list__meta">${requisito ? esc(requisito) : (e.aviso ? 'Con aviso de seguridad' : '')}</span>
@@ -119,14 +115,12 @@ function htmlDetalle(ej) {
         ${ej.unilateral ? '<span class="chip">Por lado</span>' : ''}
       </p>
 
-      <div class="card empty-state" role="img" aria-label="Animación pendiente">
-        <span class="list__thumb" aria-hidden="true">${MINIATURA}</span>
-        <p>Animación en la Fase 4</p>
-      </div>
+      <div class="figure-card">${htmlFigura(ej.id, { tamano: 'grande' })}</div>
 
       ${requisito ? `<p class="mount-alert">${esc(requisito)}: ahora no está disponible con tu equipo.</p>` : ''}
       ${ej.aviso ? `<div class="mount-alert" role="note"><span><strong>Aviso</strong><br>${esc(ej.aviso)}</span></div>` : ''}
 
+      ${seccion('Músculos trabajados', `<div class="figure-card figure-card--mapa">${htmlMapaMusculos(ej.musculosPrincipales, ej.musculosSecundarios)}</div>`)}
       ${seccion('Músculos principales', chipsMusculos(ej.musculosPrincipales))}
       ${ej.musculosSecundarios && ej.musculosSecundarios.length ? seccion('Músculos secundarios', chipsMusculos(ej.musculosSecundarios)) : ''}
       ${seccion('Para qué sirve', `<p>${esc(ej.paraQueSirve)}</p>`)}

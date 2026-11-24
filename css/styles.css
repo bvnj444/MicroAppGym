@@ -1451,6 +1451,26 @@ label.row:has(> input:disabled) {
   flex: none;
 }
 
+/* Figura animada del ejercicio y mapa de músculos (js/animations.js) */
+.figure-card {
+  display: grid;
+  place-items: center;
+  padding: var(--space-3);
+  border-radius: 16px;
+  background: var(--surface-2);
+}
+
+.figure-card .anim-fig--grande {
+  width: 100%;
+  height: auto;
+  max-height: 240px;
+  aspect-ratio: 4 / 3;
+}
+
+.figure-card--mapa .anim-mapa {
+  max-width: 260px;
+}
+
 /* ---------- 15. Movimiento reducido ---------- */
 @media (prefers-reduced-motion: reduce) {
   *,
