@@ -38,7 +38,11 @@
  *   inventario: { '1250': 8, '2000': 4, '2500': 4 }, // gramos del disco -> unidades TOTALES
  *   piezas: { mango: 500, conector: 500, tuerca: 125 },        // gramos por pieza
  *   tuercas: { porMancuerna: 2, barra: 2 },                    // tuercas por montaje
- *   maxDiscosPorLadoMango: 7000      // gramos de discos que caben por lado de un mango
+ *   maxDiscosPorLadoMango: 7000,     // gramos de discos que caben por lado de un mango
+ *   avisos: {                        // aviso al terminar el descanso (timer.js)
+ *     modo: 'ambos',                 // 'ambos' | 'sonido' | 'vibracion'
+ *     pitarBloqueado: false          // audio casi silencioso en bucle para pitar con el móvil bloqueado
+ *   }
  * }
  *   Ojo: las claves de `inventario` son texto en JSON; conviértelas con Number().
  *
@@ -139,6 +143,7 @@ const CONFIG_POR_DEFECTO = Object.freeze({
   piezas: { mango: 500, conector: 500, tuerca: 125 },
   tuercas: { porMancuerna: 2, barra: 2 },
   maxDiscosPorLadoMango: 7000,
+  avisos: { modo: 'ambos', pitarBloqueado: false },
 });
 
 /*
@@ -261,6 +266,7 @@ export function getConfig() {
     inventario: { ...base.inventario, ...objeto(guardada.inventario) },
     piezas: { ...base.piezas, ...objeto(guardada.piezas) },
     tuercas: { ...base.tuercas, ...objeto(guardada.tuercas) },
+    avisos: { ...base.avisos, ...objeto(guardada.avisos) },
   };
   return validarConfig(config, base);
 }
@@ -286,6 +292,10 @@ function validarConfig(config, base) {
   config.diasSemana = dias.length === config.diasPorSemana
     ? dias
     : (config.diasPorSemana === base.diasPorSemana ? [...base.diasSemana] : DIAS_POR_DEFECTO[config.diasPorSemana]);
+
+  if (!['ambos', 'sonido', 'vibracion'].includes(config.avisos.modo)) config.avisos.modo = base.avisos.modo;
+  config.avisos.pitarBloqueado = config.avisos.pitarBloqueado === true;
+  config.avisos = { modo: config.avisos.modo, pitarBloqueado: config.avisos.pitarBloqueado };
 
   for (const grupo of ['equipo']) {
     for (const k of Object.keys(config[grupo])) {

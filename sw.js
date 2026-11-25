@@ -5,7 +5,7 @@
  * Rutas relativas a este archivo: funciona en la raíz y en /repo/ de GitHub Pages.
  */
 
-const CACHE = 'gym-v6';
+const CACHE = 'gym-v7';
 
 const ARCHIVOS = [
   './',

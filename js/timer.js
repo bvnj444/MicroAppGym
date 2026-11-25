@@ -26,7 +26,20 @@
  *                     transcurridoMs: en el libre, ms del ejercicio hechos (sin la preparación).
  *   alCambiar(fn)  -> función para quitar el oyente. fn(estado()) al iniciar, ajustar, cambiar
  *                     de fase, terminar y cerrar (no en cada segundo).
+ *   probarAviso()  -> hace el aviso de fin (según Ajustes) sin cronómetro. Llamar dentro de un toque.
+ *   canalesAviso(avisos) -> { sonido, vibracion, pitarBloqueado } (función pura, para pruebas).
  *   crearCronometro({ ahora, guardar, borrar, alEvento }) -> núcleo sin DOM (para pruebas).
+ *
+ * Modo de aviso: storage.getConfig().avisos = { modo: 'ambos' | 'sonido' | 'vibracion',
+ * pitarBloqueado }. Se lee en el momento de avisar o de programar los pitidos (no se guarda
+ * al iniciar) y se reprograma al recibir el evento window 'mag:config'. El destello sale siempre.
+ *   'sonido'    -> sin vibración (fin, aviso de 3 s, "¡Ya!").
+ *   'vibracion' -> sin pitidos (ni los programados en el reloj de audio).
+ * pitarBloqueado (y modo distinto de 'vibracion'): mientras hay una cuenta activa suena en bucle
+ * un <audio> casi silencioso (WAV generado al vuelo) para que Chrome Android trate la página como
+ * reproducción multimedia y no suspenda Web Audio con la pantalla bloqueada. Se muestra en la
+ * notificación multimedia ("Descanso · 1:30"); sus botones Pausa/Detener equivalen a "Saltar".
+ * Se para 3 s después del fin (para no cortar los pitidos) o al saltar, detener o cerrar.
  *
  * Guardado: clave 'mag:cronometro' (storage.set/get, envuelta en { v, d } como las demás):
  *   { version: 1, modo: 'descanso' | 'libre', etiqueta, siguiente,
@@ -230,6 +243,25 @@ export function crearCronometro({
 }
 
 /* =====================================================================
+ * Modo de aviso (función pura)
+ * ===================================================================== */
+
+const MODOS_AVISO = ['ambos', 'sonido', 'vibracion'];
+
+/** Decide por qué canales se avisa según config.avisos (con valores por defecto si falta). */
+export function canalesAviso(avisos) {
+  const a = avisos && typeof avisos === 'object' ? avisos : {};
+  const modo = MODOS_AVISO.includes(a.modo) ? a.modo : 'ambos';
+  const sonido = modo !== 'vibracion';
+  return { sonido, vibracion: modo !== 'sonido', pitarBloqueado: sonido && a.pitarBloqueado === true };
+}
+
+/** Lee la configuración actual (puede cambiar con un descanso en marcha). */
+function canales() {
+  try { return canalesAviso(storage.getConfig().avisos); } catch (e) { return canalesAviso(null); }
+}
+
+/* =====================================================================
  * Oyentes públicos
  * ===================================================================== */
 
@@ -274,6 +306,7 @@ export function iniciarDescanso(segundos, opciones = {}) {
   prepararVista();
   const r = nucleo.iniciarDescanso(segundos, opciones);
   anunciar(`${r.etiqueta}: ${textoDuracion(r.totalMs)}`);
+  iniciarAudioFondo(); // llega de un toque: se puede reproducir
   return r;
 }
 
@@ -281,6 +314,7 @@ export function iniciarLibre(segundos, opciones = {}) {
   prepararVista();
   const r = nucleo.iniciarLibre(segundos, opciones);
   anunciar(`Prepárate: ${r.etiqueta}, ${textoDuracion(nucleo.datos().totalMs)}`);
+  iniciarAudioFondo();
   return r;
 }
 
@@ -330,6 +364,7 @@ function alCambioNucleo(est) {
       clearTimeout(timeoutId);
       cancelarAudio();
       soltarWakeLock();
+      pararAudioFondo();
     }
   }
   avisarOyentes(oyentesCambio, est);
@@ -353,6 +388,8 @@ function alFinNucleo(detalle) {
       anunciar(detalle.modo === 'libre' ? 'Tiempo cumplido' : 'Descanso terminado');
     }
     nucleo.marcarAvisado();
+    actualizarTituloFondo();
+    pararAudioFondoEn(PARAR_FONDO_TRAS_FIN_MS);
   }
   avisarOyentes(oyentesFin, detalle);
 }
@@ -379,6 +416,7 @@ function avisoAlVolver() {
 }
 
 function vibrar(patron) {
+  if (!canales().vibracion) return;
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(patron);
   } catch (e) { /* sin vibración: queda el aviso visual */ }
@@ -476,7 +514,7 @@ function tresPitidos(inicio) {
 }
 
 function pitidosFin() {
-  if (!audioListo()) return;
+  if (!audioListo() || !canales().sonido) return;
   try { tresPitidos(audio.currentTime + 0.03); } catch (e) { console.warn('[timer] Pitido', e); }
 }
 
@@ -506,7 +544,7 @@ function programarAudio() {
   const d = nucleo.datos();
   if (d && d.terminado) return; // el pitido final ya está sonando o se avisa aparte
   cancelarAudio();
-  if (!d || !audioListo()) return;
+  if (!d || !audioListo() || !canales().sonido) return;
   const ahora = Date.now();
   const base = audio.currentTime;
   const enAudio = (ms) => base + (ms - ahora) / 1000;
@@ -530,6 +568,132 @@ function programarAudio() {
   } catch (e) {
     console.warn('[timer] No se pudieron programar los pitidos', e);
   }
+}
+
+/** Aviso de fin de prueba (botón "Probar aviso" de Ajustes). Llamar dentro de un toque. */
+export function probarAviso() {
+  const c = canales();
+  asegurarUIsiHayDOM();
+  destello();
+  vibrar(VIBRACION_FIN);
+  if (c.sonido) {
+    return desbloquearAudio().then(() => { pitidosFin(); return c; }).catch(() => c);
+  }
+  return Promise.resolve(c);
+}
+
+/* ---------- Audio de fondo: pitar con el móvil bloqueado ---------- */
+
+const PARAR_FONDO_TRAS_FIN_MS = 3000;  // deja sonar los 3 pitidos antes de soltar la sesión
+const TITULO_CADA_MS = 15000;
+
+let fondo = null;          // <audio> en bucle
+let fondoUrl = '';
+let fondoTituloId = 0;
+let fondoParadaId = 0;
+
+/** WAV mono PCM 16 bit con ruido de amplitud ínfima (±2/32767): inaudible pero no "silencio". */
+export function wavCasiSilencio(segundos = 8, muestreo = 8000) {
+  const n = segundos * muestreo;
+  const buf = new ArrayBuffer(44 + n * 2);
+  const v = new DataView(buf);
+  const txt = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  txt(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); txt(8, 'WAVE');
+  txt(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, muestreo, true); v.setUint32(28, muestreo * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  txt(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.round(Math.random() * 4) - 2, true);
+  return buf;
+}
+
+const hayMediaSession = () => hayDOM && 'mediaSession' in navigator;
+
+function tituloFondo() {
+  const e = nucleo.estado();
+  if (e.fase === 'prep') return `Prepárate · ${e.etiqueta}`;
+  if (e.terminado) return e.modo === 'libre' ? 'Tiempo cumplido' : 'Descanso terminado';
+  return `${e.etiqueta} · ${formato(Math.ceil(e.restanteMs / 1000))}`;
+}
+
+function actualizarTituloFondo() {
+  if (!fondo || !hayMediaSession() || typeof MediaMetadata === 'undefined') return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: tituloFondo(),
+      artist: 'MicroApp Gym',
+      artwork: [{ src: './icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: './icons/icon-512.png', sizes: '512x512', type: 'image/png' }],
+    });
+  } catch (e) { /* sin metadatos */ }
+}
+
+/** Empieza el bucle (solo dentro de un toque, con cuenta activa y la opción activada). */
+function iniciarAudioFondo() {
+  if (!hayDOM || typeof Audio === 'undefined') return;
+  if (!canales().pitarBloqueado || !nucleo.estado().activo) { pararAudioFondo(); return; }
+  clearTimeout(fondoParadaId);
+  try {
+    if (!fondo) {
+      fondoUrl = URL.createObjectURL(new Blob([wavCasiSilencio()], { type: 'audio/wav' }));
+      fondo = new Audio();
+      fondo.loop = true;
+      fondo.playsInline = true;
+      fondo.setAttribute('playsinline', '');
+      fondo.preload = 'auto';
+      fondo.volume = 1; // el ruido ya es inaudible
+      fondo.src = fondoUrl;
+    }
+    const promesa = fondo.play();
+    if (promesa && promesa.catch) promesa.catch((e) => console.warn('[timer] No se pudo iniciar el audio de fondo', e));
+  } catch (e) {
+    console.warn('[timer] Audio de fondo no disponible', e);
+    return;
+  }
+  if (hayMediaSession()) {
+    const ms = navigator.mediaSession;
+    // Pausa/Detener en la notificación = "Saltar" (termina el descanso y avisa a la sesión).
+    for (const [accion, fn] of [['pause', () => nucleo.saltar()], ['stop', () => nucleo.saltar()], ['play', () => {}]]) {
+      try { ms.setActionHandler(accion, fn); } catch (e) { /* acción no admitida */ }
+    }
+    try { ms.playbackState = 'playing'; } catch (e) { /* nada */ }
+  }
+  actualizarTituloFondo();
+  clearInterval(fondoTituloId);
+  fondoTituloId = setInterval(actualizarTituloFondo, TITULO_CADA_MS);
+}
+
+function pararAudioFondoEn(ms) {
+  if (!fondo) return;
+  clearTimeout(fondoParadaId);
+  fondoParadaId = setTimeout(pararAudioFondo, ms);
+}
+
+function pararAudioFondo() {
+  clearTimeout(fondoParadaId);
+  clearInterval(fondoTituloId);
+  if (!fondo) return;
+  const a = fondo;
+  fondo = null;
+  try { a.pause(); a.removeAttribute('src'); a.src = ''; a.load(); } catch (e) { /* nada */ }
+  if (fondoUrl) { try { URL.revokeObjectURL(fondoUrl); } catch (e) { /* nada */ } fondoUrl = ''; }
+  if (hayMediaSession()) {
+    const ms = navigator.mediaSession;
+    try { ms.metadata = null; ms.playbackState = 'none'; } catch (e) { /* nada */ }
+    for (const accion of ['pause', 'stop', 'play']) {
+      try { ms.setActionHandler(accion, null); } catch (e) { /* nada */ }
+    }
+  }
+}
+
+/** Para pruebas y depuración en el móvil. */
+export function diagnostico() {
+  return {
+    canales: canales(),
+    audioContext: audio ? audio.state : null,
+    pitidosProgramados: programados.length,
+    audioFondo: fondo ? { reproduciendo: !fondo.paused, src: fondo.src, bucle: fondo.loop } : null,
+    wakeLock: !!(centinela && !centinela.released),
+  };
 }
 
 /* ---------- Wake Lock (pantalla encendida) ---------- */
@@ -840,9 +1004,18 @@ function iniciarModulo() {
     document.removeEventListener('pointerdown', primerToque, true);
     document.removeEventListener('keydown', primerToque, true);
     desbloquearAudio();
+    if (nucleo.estado().activo) iniciarAudioFondo(); // cronómetro restaurado tras recargar
   };
   document.addEventListener('pointerdown', primerToque, { capture: true });
   document.addEventListener('keydown', primerToque, { capture: true });
+  // Ajustes guardados: respetar el nuevo modo de aviso con el cronómetro en marcha.
+  window.addEventListener('mag:config', () => {
+    const e = nucleo.estado();
+    if (!e.activo) return;
+    programarAudio();
+    if (!canales().pitarBloqueado) pararAudioFondo();
+    else if (!fondo) iniciarAudioFondo(); // llega del toque en "Guardar"
+  });
 
   // Retomar un cronómetro guardado (app recargada o reabierta).
   if (!nucleo.restaurar(storage.get(CLAVE_CRONOMETRO, null))) return;

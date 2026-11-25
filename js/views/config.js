@@ -9,6 +9,7 @@
  */
 
 import * as planner from '../planner.js';
+import * as timer from '../timer.js';
 
 const DIAS = [
   [1, 'L', 'lunes'], [2, 'M', 'martes'], [3, 'X', 'miércoles'], [4, 'J', 'jueves'],
@@ -156,6 +157,24 @@ function pintar(contenedor, ctx) {
         <label class="row"><input type="checkbox" disabled> <span>Banco <span class="muted">(próximamente)</span></span></label>
       </section>
 
+      <section class="card stack" aria-label="Aviso del descanso">
+        <h2 class="card__title">Aviso del descanso</h2>
+        <p class="card__meta">Se guarda al momento. El destello en pantalla sale siempre.</p>
+        ${segmentado({ id: 'cfg-aviso-modo', etiqueta: 'Al terminar el descanso', opciones: [
+          { valor: 'ambos', texto: 'Ambos', titulo: 'Sonido y vibración', elegida: c.avisos.modo === 'ambos' },
+          { valor: 'sonido', texto: 'Sonido', titulo: 'Solo sonido', elegida: c.avisos.modo === 'sonido' },
+          { valor: 'vibracion', texto: 'Vibración', titulo: 'Solo vibración', elegida: c.avisos.modo === 'vibracion' },
+        ] })}
+        <label class="row">
+          <input type="checkbox" data-accion="pitar-bloqueado"${c.avisos.pitarBloqueado ? ' checked' : ''}${c.avisos.modo === 'vibracion' ? ' disabled' : ''}>
+          <span>Pitar aunque el móvil esté bloqueado</span>
+        </label>
+        <p class="muted">${c.avisos.modo === 'vibracion'
+          ? 'Con «Solo vibración» no hay pitido. Con el móvil bloqueado Chrome no deja vibrar: verás el aviso al desbloquearlo.'
+          : 'Mantiene el sonido de la app activo durante el descanso. Verás un control de reproducción en las notificaciones mientras dura. La vibración no funciona con el móvil bloqueado.'}</p>
+        <button type="button" class="btn btn--secondary btn--block" data-accion="probar-aviso">Probar aviso</button>
+      </section>
+
       <button type="submit" class="btn btn--primary btn--block">${inicial ? 'Crear mi rutina' : 'Guardar ajustes'}</button>
       <button type="button" class="btn btn--ghost btn--block" data-accion="restablecer">Volver a los valores estimados</button>
 
@@ -177,6 +196,15 @@ function conectar(contenedor, ctx) {
   const form = contenedor.querySelector('form');
 
   contenedor.querySelector('[data-accion="volver"]')?.addEventListener('click', () => ctx.volver());
+
+  contenedor.querySelector('[data-accion="pitar-bloqueado"]').addEventListener('change', (evento) => {
+    guardarAvisos(ctx, { ...borrador.avisos, pitarBloqueado: evento.target.checked });
+    pintar(contenedor, ctx);
+    contenedor.querySelector('[data-accion="pitar-bloqueado"]')?.focus();
+  });
+  contenedor.querySelector('[data-accion="probar-aviso"]').addEventListener('click', () => {
+    if (typeof timer.probarAviso === 'function') timer.probarAviso();
+  });
 
   // Segmentados
   form.addEventListener('click', (evento) => {
@@ -208,6 +236,8 @@ function conectar(contenedor, ctx) {
       borrador.diasSemana = [...dias].sort((a, b) => a - b);
     } else if (grupo === 'cfg-nivel') {
       borrador.nivel = valor;
+    } else if (grupo === 'cfg-aviso-modo') {
+      guardarAvisos(ctx, { ...borrador.avisos, modo: valor });
     }
     pintar(contenedor, ctx);
     contenedor.querySelector(`[data-grupo="${grupo}"] [data-valor="${valor}"]`)?.focus();
@@ -258,6 +288,7 @@ function conectar(contenedor, ctx) {
       return;
     }
     const config = storage.getConfig();
+    window.dispatchEvent(new CustomEvent('mag:config'));
     let rutinaOk = true;
     try {
       if (regenerar) rutinaOk = ctx.guardarRutina(planner.generarRutina(config));
@@ -281,7 +312,8 @@ function conectar(contenedor, ctx) {
 
   contenedor.querySelector('[data-accion="restablecer"]').addEventListener('click', () => {
     const base = storage.configPorDefecto();
-    borrador = { ...base, configurado: borrador.configurado, fechaInicio: borrador.fechaInicio };
+    // Los avisos se guardan al momento y no son "valores estimados": se conservan.
+    borrador = { ...base, configurado: borrador.configurado, fechaInicio: borrador.fechaInicio, avisos: borrador.avisos };
     pintar(contenedor, ctx);
     ctx.toast('Valores estimados puestos. Pulsa Guardar para aplicarlos.');
   });
@@ -325,6 +357,17 @@ function conectar(contenedor, ctx) {
       archivo.value = '';
     }
   });
+}
+
+/** Los avisos del descanso se guardan al momento (sin pasar por "Guardar ajustes"). */
+function guardarAvisos(ctx, avisos) {
+  borrador.avisos = avisos;
+  const guardada = ctx.storage.getConfig();
+  if (!ctx.storage.setConfig({ ...guardada, avisos })) {
+    ctx.toast('No se ha podido guardar el aviso.');
+    return;
+  }
+  window.dispatchEvent(new CustomEvent('mag:config'));
 }
 
 function fechaLocal(fecha) {
