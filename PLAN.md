@@ -1,6 +1,6 @@
 # MicroApp Gym — Plan de implementación
 
-> Estado: **Fases 1 a 5 terminadas y revisadas por qa-movil (la Fase 5 está pendiente de confirmar en el Android: vibración, pitido, pantalla encendida y desfase ≤ 1 s). Publicada en https://bvnj444.github.io/MicroAppGym/. Siguiente: Fase 6 (sesión activa).**
+> Estado: **Fases 1 a 5 terminadas y revisadas por qa-movil (la Fase 5, confirmada en el Android). Publicada en https://bvnj444.github.io/MicroAppGym/. Siguiente: Fase 6 (sesión activa).**
 > Última actualización: 23/11/2026 (revisión 2: correcciones de los subagentes experto-ejercicios, logica-entrenamiento y qa-movil)
 
 ---
@@ -487,6 +487,19 @@ Cada fase termina con una revisión de **qa-movil**. Una fase solo está termina
 - **qa-movil** no informa de ningún problema bloqueante ni importante.
 - El usuario completa una semana real de entrenamiento con la app.
 
+### Fase 9 — App Android (Capacitor)
+Motivo: una web app, aunque esté instalada desde Chrome, no puede vibrar con la pantalla bloqueada ni avisar a una hora exacta sin servidor. Empaquetada como app nativa, sí.
+- Empaquetar la misma app (sin reescribirla) con **Capacitor** en un `.apk` para Android. Se instala a mano ("orígenes desconocidos"); Play Store es opcional (cuenta de desarrollador, 25 USD una vez).
+- **Fin del descanso con alarma exacta del sistema:** al iniciar el descanso se programa una notificación local a la hora del fin, con el modo de aviso elegido (sonido, vibración o ambos). Suena y vibra con el móvil bloqueado. Se cancela o reprograma al saltar o ajustar ±15 s.
+- **Recordatorios de racha a hora fija** con notificaciones locales programadas (sustituyen a Periodic Background Sync).
+- `timer.js` y las notificaciones detectan si corren dentro de Capacitor y usan los plugins nativos; en la web siguen igual que ahora.
+- Guía o script para generar el `.apk` en el PC del usuario (Android Studio).
+
+**Terminado cuando:**
+- Con el modo "Solo vibración" y el móvil bloqueado, el móvil vibra al terminar el descanso con 1 s o menos de desfase.
+- El recordatorio de racha llega a la hora elegida.
+- La versión web de GitHub Pages sigue funcionando igual.
+
 ---
 
 ## 12. Decisiones
@@ -499,4 +512,6 @@ Cada fase termina con una revisión de **qa-movil**. Una fase solo está termina
 - [x] **Inicio del desarrollo (Fase 1):** hecho en local (23/11/2026). El usuario tiene cuenta de GitHub.
 - [x] **Publicación en GitHub Pages:** confirmada. El código está en `github.com/bvnj444/MicroAppGym`, con el correo privado de GitHub en los commits.
 - [ ] **Activar GitHub Pages** en los ajustes del repositorio (lo hace el usuario): *Settings → Pages → Deploy from a branch → `main` / `(root)`*.
-- [x] **Notificaciones de racha:** sí, sin servidor (al terminar la sesión y recordatorio aproximado con Periodic Background Sync). La hora exacta con Web Push queda como mejora opcional.
+- [x] **Notificaciones de racha:** sí, sin servidor (al terminar la sesión y recordatorio aproximado con Periodic Background Sync). La hora exacta llega con la Fase 9 (app nativa).
+- [x] **App nativa (Fase 9):** tras terminar la web (Fases 6–8) se empaqueta con Capacitor para que el aviso del descanso vibre con el móvil bloqueado y los recordatorios lleguen a su hora (24/11/2026).
+- [x] **Aviso del descanso configurable:** ambos, solo sonido o solo vibración, y "Pitar aunque el móvil esté bloqueado" (audio de fondo). Confirmado en el Android (24/11/2026).
