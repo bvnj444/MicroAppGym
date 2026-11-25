@@ -7,6 +7,9 @@
  * Usa el ctx de app.js: hoy(), obtenerRutina(), guardarRutina(rutina), config(), navegar(ruta),
  * toast(mensaje), kg(gramos). Lee los datos frescos en cada render().
  * Toda la lógica de rutina es de planner.js y la de discos de data/equipment.js.
+ * "Empezar" crea la sesión (workout.crearSesion) del día elegido con la fecha de HOY, la guarda
+ * en CLAVES.sesionActiva y navega a 'sesion'. Si ya hay una a medias, un panel pregunta si
+ * retomarla o empezar de nuevo (la anterior se guarda en el historial si tiene series hechas).
  *
  * Índices: diaParaFecha devuelve una COPIA del día con el nivel aplicado y en el mismo orden;
  * para editar se usa el día GUARDADO (rutina.dias, por id) y sus valores base.
@@ -16,7 +19,8 @@ import * as planner from '../planner.js';
 import { EJERCICIOS } from '../data/exercises.js';
 import { htmlFigura, pausarFiguras } from '../animations.js';
 import { calcularMontaje, cambiosMontaje, textoMontaje, textoCambios } from '../data/equipment.js';
-import { desbloquearAudio, iniciarDescanso, iniciarLibre } from '../timer.js';
+import { crearSesion, pasoActual, resumen, textoTecnica } from '../workout.js';
+import { archivarSesion, leerSesionActiva } from './sesion.js';
 
 const POR_ID = new Map(EJERCICIOS.map((e) => [e.id, e]));
 const LETRAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -84,20 +88,6 @@ function textoMeta(item, ctx) {
   const partes = [textoSeries(item), `${item.descanso} s`];
   if (planner.tipoMontaje(item) && item.pesoSugerido != null) partes.push(ctx.kg(item.pesoSugerido));
   return partes.join(' · ');
-}
-
-function textoTecnica(item) {
-  const notas = [];
-  if (item.tempo) {
-    const bajada = Number(String(item.tempo).split('-')[0]);
-    notas.push(bajada > 1 ? `Baja en ${bajada} s (tempo ${item.tempo})` : `Tempo ${item.tempo}`);
-  }
-  if (item.pausa) {
-    const ej = POR_ID.get(item.ejercicioId);
-    const paso = ej && (ej.variantes || []).find((v) => v && v.tipo === 'pausa' && v.segundos === item.pausa && v.donde);
-    notas.push(`Pausa ${item.pausa} s${paso ? ' ' + paso.donde : ''}`);
-  }
-  return notas.join(' · ');
 }
 
 /* ---------- Bloques por montaje y avisos ---------- */
@@ -274,11 +264,97 @@ export function render(contenedor, ctx) {
       fechaElegida = boton.dataset.fecha;
       render(contenedor, ctx);
     } else if (boton.dataset.accion === 'empezar') {
-      ctx.toast('La sesión activa llega en la Fase 6');
+      empezar(contenedor, ctx, elegido.dia);
     } else if (boton.dataset.indice !== undefined && elegido.dia) {
       abrirPanel(contenedor, ctx, elegido.dia.id, Number(boton.dataset.indice), elegido.dia.ajustePrincipiante);
     }
   });
+}
+
+/* ---------- Empezar la sesión ---------- */
+
+function empezar(contenedor, ctx, dia) {
+  // leerSesionActiva valida la sesión guardada; si está corrupta la aparta y devuelve null.
+  const activa = leerSesionActiva(ctx.storage);
+  if (!activa) { empezarNueva(ctx, dia); return; }
+  try {
+    abrirPanelSesion(contenedor, ctx, dia, activa);
+  } catch (err) {
+    console.error('[rutina] No se pudo mostrar la sesión a medias', err);
+    cerrarPanel();
+    ctx.toast('No se ha podido leer la sesión a medias');
+  }
+}
+
+function empezarNueva(ctx, dia) {
+  const d = datos(ctx);
+  let sesion;
+  try {
+    // Fecha de la sesión: HOY (aunque se haya elegido otro día de la semana para verlo).
+    sesion = crearSesion(d.rutina(), dia.id, d.hoy(), d.config());
+  } catch (err) {
+    ctx.toast(err && err.message ? err.message : 'No se ha podido crear la sesión');
+    return;
+  }
+  if (!ctx.storage.set(ctx.storage.CLAVES.sesionActiva, sesion)) {
+    ctx.toast('No se ha podido guardar la sesión');
+    return;
+  }
+  cerrarPanel();
+  ctx.navegar('sesion');
+}
+
+/** Panel: ya hay una sesión a medias -> retomarla o empezar de nuevo. */
+function abrirPanelSesion(contenedor, ctx, dia, activa) {
+  cerrarPanel();
+  const r = resumen(activa);
+  const paso = pasoActual(activa);
+  const nombreActiva = activa.diaNombre || activa.diaId || 'la sesión anterior';
+  const textoNueva = r.seriesHechas > 0
+    ? `Empezar ${dia.nombre} (${nombreActiva} se guarda)`
+    : `Empezar ${dia.nombre} (${nombreActiva} se descarta)`;
+  const panel = document.createElement('dialog');
+  panel.className = 'sheet';
+  panel.setAttribute('aria-labelledby', 'sheet-titulo');
+  panelAbierto = panel;
+  fondoPausado = contenedor;
+  pausarFiguras(contenedor, true);
+  panel.innerHTML = `
+    <div class="sheet__handle" aria-hidden="true"></div>
+    <header class="sheet__header">
+      <h2 class="sheet__title" id="sheet-titulo">Tienes una sesión a medias</h2>
+      <button type="button" class="btn btn--ghost btn--icon" data-accion="cerrar" aria-label="Cerrar">✕</button>
+    </header>
+    <div class="sheet__body">
+      <p>${esc(nombreActiva)} · ${r.seriesHechas} de ${r.seriesTotales} series hechas${paso ? ` · sigue en ${esc(nombreEj(paso.item.ejercicioId))}` : ''}</p>
+      <p class="muted">${r.seriesHechas > 0
+        ? `Si empiezas ${esc(dia.nombre)}, ${esc(nombreActiva)} se guarda en el historial con las series hechas.`
+        : `Si empiezas ${esc(dia.nombre)}, ${esc(nombreActiva)} se descarta (no tiene series hechas).`}</p>
+    </div>
+    <footer class="sheet__footer">
+      <button type="button" class="btn btn--primary btn--block" data-accion="retomar">Retomar sesión</button>
+      <button type="button" class="btn btn--secondary btn--block" data-accion="nueva">${esc(textoNueva)}</button>
+    </footer>`;
+  panel.addEventListener('click', (e) => {
+    if (e.target === panel) { cerrarPanel(); return; }
+    const boton = e.target.closest('button');
+    if (!boton) return;
+    const { accion } = boton.dataset;
+    if (accion === 'cerrar') cerrarPanel();
+    else if (accion === 'retomar') { cerrarPanel(); ctx.navegar('sesion'); }
+    else if (accion === 'nueva') {
+      const st = ctx.storage;
+      if (r.seriesHechas > 0) {
+        if (!archivarSesion(st, activa)) { ctx.toast('No se ha podido guardar la sesión anterior'); return; }
+      } else st.set(st.CLAVES.sesionActiva, null);
+      empezarNueva(ctx, dia);
+    }
+  });
+  panel.addEventListener('cancel', (e) => { e.preventDefault(); cerrarPanel(); });
+  contenedor.appendChild(panel);
+  if (typeof panel.showModal === 'function') panel.showModal();
+  else panel.setAttribute('open', '');
+  panel.querySelector('[data-accion="retomar"]')?.focus();
 }
 
 /* ---------- Panel de ajuste ---------- */
@@ -382,20 +458,7 @@ function abrirPanel(contenedor, ctx, diaId, indice, ajustePrincipiante) {
         <button type="button" class="btn btn--primary btn--block" data-accion="guardar">Guardar</button>
         <button type="button" class="btn btn--secondary btn--block" data-accion="cambiar">Cambiar ejercicio</button>
         <button type="button" class="btn btn--ghost btn--block" data-accion="tecnica">Ver técnica</button>
-        <button type="button" class="btn btn--secondary btn--block" data-accion="probar">${textoProbar()}</button>
       </footer>`;
-  };
-
-  // Prueba del cronómetro (Fase 5) con los valores que se ven en el panel.
-  const segundosLibre = () => (rangoVisible ? b.max : (item.segundos || [30, 45])[1]);
-  const textoProbar = () => (esTiempo ? `▶ Cronómetro (${segundosLibre()} s)` : `▶ Probar descanso (${b.descanso} s)`);
-  const probar = () => {
-    desbloquearAudio(); // dentro del toque: desbloquea el sonido
-    const nombre = nombreEj(item.ejercicioId);
-    if (esTiempo) iniciarLibre(segundosLibre(), { etiqueta: nombre });
-    else iniciarDescanso(b.descanso, { etiqueta: 'Descanso', siguiente: nombre });
-    // Igual que "Guardar": guarda los cambios pendientes (si los hay) y cierra el panel.
-    guardar();
   };
 
   const pintarCambio = () => {
@@ -464,15 +527,12 @@ function abrirPanel(contenedor, ctx, diaId, indice, ajustePrincipiante) {
         const out = panel.querySelector(`[data-valor="${campo}"]`);
         if (out) out.textContent = b[campo] + (campo === 'descanso' ? ' s' : campo === 'series' ? '' : unidad);
       }
-      const botonProbar = panel.querySelector('[data-accion="probar"]');
-      if (botonProbar) botonProbar.textContent = textoProbar();
     } else if (boton.dataset.peso) {
       iPeso = limitar(iPeso + Number(boton.dataset.peso), 0, pesos.length - 1);
       pintarAjuste();
       panel.querySelector(`[data-peso="${boton.dataset.peso}"]`)?.focus();
     } else if (accion === 'guardar') guardar();
     else if (accion === 'cerrar') cerrarPanel();
-    else if (accion === 'probar') probar();
     else if (accion === 'cambiar') pintarCambio();
     else if (accion === 'volver') pintarAjuste();
     else if (accion === 'tecnica') { cerrarPanel(); ctx.abrirEjercicio(item.ejercicioId); }

@@ -20,7 +20,9 @@
  *   CLAVES.rutina        -> 'mag:rutina'         Rutina generada por planner.js
  *   CLAVES.sesiones      -> 'mag:sesiones'       Array de registros de sesión terminados
  *   CLAVES.sesionActiva  -> 'mag:sesionActiva'   Registro de sesión a medias (o null)
- *   CLAVES.meta          -> 'mag:meta'           Datos internos (aperturas, etc.)
+ *   CLAVES.meta          -> 'mag:meta'           Datos internos (aperturas, etc.; resumenPendiente:
+ *                                                id de la sesión terminada fuera de la pantalla de sesión,
+ *                                                cuyo resumen se muestra una vez al volver a #sesion)
  *   'mag:cronometro'     Estado temporal del cronómetro (timer.js): finEn absoluto, modo, etc.
  *                        No está en CLAVES: no se exporta ni se importa y se borra al cerrarlo.
  *   Copias de datos corruptos: 'mag:corrupto:<clave>:<marca de tiempo>' (texto tal cual).
@@ -87,18 +89,27 @@
  *   inicio: '2026-11-23T18:00:00.000Z',
  *   fin: null,                       // ISO al terminar
  *   terminada: false,
- *   posicion: { ejercicio: 0, serie: 0 }, // dónde retomar una sesión a medias
+ *   diaNombre: 'Torso A',
+ *   posicion: { ejercicio: 0, serie: 0 }, // siguiente serie por hacer (para retomar)
+ *   cronoLibre: null,                // { ejercicio, serie } con el cronómetro libre en marcha | null
  *   ejercicios: [
  *     {
  *       ejercicioId: 'press-suelo-barra',
  *       variante: null,              // variante usada | null
+ *       montaje: 'barra', numMancuernas: null,           // copia del plan (workout.js)
+ *       repeticiones: [8, 12], segundos: null, casiFallo: false,
+ *       descanso: 120, tempo: null, pausa: null, superserieCon: null,
+ *       saltado: false,
  *       series: [
- *         { peso: 10750, repeticiones: 10, segundos: null, hecha: true }
- *         // peso en gramos (por mancuerna o total de la barra; 0 en peso corporal)
+ *         { peso: 10750, repeticiones: 10, segundos: null, hecha: true, hechaEn: '2026-11-23T18:05:00.000Z' }
+ *         // peso en gramos (por mancuerna o total de la barra; 0 en peso corporal).
+ *         // Se crean con los valores planeados y hecha: false.
  *       ]
  *     }
  *   ]
  * }
+ *   Volumen (workout.resumen): Σ peso × repeticiones de las series hechas; par de
+ *   mancuernas ×2; una mancuerna, barra y unilaterales tal cual.
  *   La sesión a medias se guarda en CLAVES.sesionActiva tras CADA serie; al terminar
  *   se añade a CLAVES.sesiones y CLAVES.sesionActiva pasa a null.
  *

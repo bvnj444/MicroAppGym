@@ -4,6 +4,8 @@
  * La lista completa con gráficas y mejores marcas llega en la Fase 7.
  */
 
+import { resumen } from '../workout.js';
+
 const formatoFecha = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 const formatoNumero = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 });
 
@@ -11,14 +13,13 @@ const esc = (texto) => String(texto ?? '').replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /** Volumen en gramos: peso × repeticiones de las series hechas. */
+// Mismo cálculo que el resumen de la sesión (par de mancuernas ×2).
 function volumenGramos(sesion) {
-  let total = 0;
-  for (const e of sesion.ejercicios || []) {
-    for (const s of e.series || []) {
-      if (s && s.hecha && Number(s.peso) > 0 && Number(s.repeticiones) > 0) total += s.peso * s.repeticiones;
-    }
+  try {
+    return resumen(sesion).volumen || 0;
+  } catch {
+    return 0;
   }
-  return total;
 }
 
 function textoFecha(fecha) {

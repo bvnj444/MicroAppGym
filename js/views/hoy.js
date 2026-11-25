@@ -178,5 +178,5 @@ export function render(contenedor, ctx) {
     boton.addEventListener('click', () => ctx.navegar('ajustes'));
   }
   contenedor.querySelector('[data-accion="empezar"]')?.addEventListener('click', () => ctx.navegar('rutina'));
-  contenedor.querySelector('[data-accion="retomar"]')?.addEventListener('click', () => ctx.navegar('rutina'));
+  contenedor.querySelector('[data-accion="retomar"]')?.addEventListener('click', () => ctx.navegar('sesion'));
 }

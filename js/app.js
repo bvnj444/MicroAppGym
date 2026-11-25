@@ -40,8 +40,11 @@ import * as rutina from './views/rutina.js';
 import * as ejercicios from './views/ejercicios.js';
 import * as historial from './views/historial.js';
 import * as config from './views/config.js';
+// Se importa al arrancar también para que registre su oyente del cronómetro
+// (la plancha se apunta aunque se esté en otra pantalla).
+import * as sesion from './views/sesion.js';
 
-const VISTAS = { hoy, rutina, ejercicios, historial, ajustes: config };
+const VISTAS = { hoy, rutina, ejercicios, historial, ajustes: config, sesion };
 const PESTANAS = ['hoy', 'rutina', 'ejercicios', 'historial'];
 const RUTA_INICIAL = 'hoy';
 
@@ -136,8 +139,8 @@ function mostrar(ruta) {
     if (activa) destino = pantalla;
   }
 
-  // La pestaña de Ajustes no existe: se resalta Hoy, desde donde se abre.
-  const pestana = PESTANAS.includes(ruta) ? ruta : 'hoy';
+  // Ajustes y Sesión no tienen pestaña: se resalta desde donde se abren.
+  const pestana = PESTANAS.includes(ruta) ? ruta : (ruta === 'sesion' ? 'rutina' : 'hoy');
   for (const item of document.querySelectorAll('.tabbar__item[data-tab]')) {
     const activa = item.dataset.tab === pestana;
     item.classList.toggle('is-active', activa);

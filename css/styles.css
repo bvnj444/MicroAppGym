@@ -39,6 +39,22 @@
                              (variables por pieza: --x, --delay, --dur,
                              --color, --drift, --rot)
    15. Movimiento reducido . prefers-reduced-motion
+   16. Sesión activa ....... .session .session--summary .session__header
+                             .session__chips .session__mount .session__figure
+                             .session__target .session__target-set
+                             .session__target-goal .session__target-weight
+                             .session__technique .session__sets
+                             .session__set(.is-current | .is-done)
+                             .session__set-text .session__actions (sticky)
+                             .session__start .session__quick
+                             .session__quick-label .session__done
+                             .session__summary .session__stats
+                             .session__summary-list .session__summary-item
+                             .session__summary-name .session__progression
+                             .session__home
+                             (en la sesión la franja .timer se compacta a una
+                             fila de --timer-h-session y su hueco se reserva
+                             siempre: "Serie hecha" no se mueve)
    ===================================================================== */
 
 /* ---------- 0. Variables ---------- */
@@ -72,6 +88,7 @@
   --tap: 56px;
   --tabbar-h: 64px;
   --timer-h: 160px; /* alto de la franja .timer (anillo + botones) */
+  --timer-h-session: 76px; /* franja compacta de una fila dentro de la sesión */
   --max-w: 430px;
 
   --safe-top: env(safe-area-inset-top, 0px);
@@ -227,13 +244,17 @@ a {
   padding-top: var(--safe-top);
   padding-left: var(--safe-left);
   padding-right: var(--safe-right);
+  /* clip (no hidden): hidden convierte el elemento en contenedor de scroll
+     y rompe position: sticky de los hijos (p. ej. .session__actions). */
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .app__main {
   padding: var(--space-4) var(--space-4)
     calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-6));
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .screen {
@@ -1780,4 +1801,375 @@ label.row:has(> input:disabled) {
   0%   { opacity: 0; }
   30%  { opacity: 0.55; }
   100% { opacity: 0; }
+}
+
+/* ---------- 16. Sesión activa ----------
+   Marcado (js/views/sesion.js):
+     .session > header.screen__header.session__header
+              + p.row.session__chips + p.mount-alert.session__mount
+              + div.figure-card.session__figure (svg.anim-fig--grande)
+              + p.session__target > .session__target-set + strong.session__target-goal
+                                    + .session__target-weight
+              + p.session__technique
+              + ol.set-pills.session__sets > li > button.session__set(.is-done|.is-current)
+                                                   > span.set-pill + span.session__set-text
+              + div.session__actions > [.session__start] + .session__quick + .session__done
+     .session.session--summary > section.card.session__summary
+              > .session__stats (.stat x3) + ul.session__summary-list
+              + .session__progression + .session__home
+   .session__actions es sticky: queda siempre por encima de la barra de
+   pestañas y, con body.has-timer, también por encima de la franja .timer. */
+.session {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* La sesión ocupa al menos el alto visible: con contenido corto las acciones
+   quedan igualmente al fondo (margin-top: auto), así "Serie hecha" está en el
+   mismo sitio aunque la figura cambie de tamaño o aparezca el cronómetro. */
+.session:has(> .session__actions) {
+  min-height: calc(100vh - var(--safe-top) - var(--space-4) - var(--tabbar-h) - var(--safe-bottom));
+  min-height: calc(100dvh - var(--safe-top) - var(--space-4) - var(--tabbar-h) - var(--safe-bottom));
+}
+
+.session__header {
+  padding-bottom: 0;
+}
+
+.session__header .screen__title {
+  font-size: 1.5rem;
+}
+
+.session__chips {
+  gap: var(--space-2);
+}
+
+.session__mount {
+  font-size: 0.9375rem;
+}
+
+/* Figura: escala dentro de ~180 px de alto, nunca se recorta */
+.session__figure {
+  padding: var(--space-2);
+}
+
+.session__figure .anim-fig--grande {
+  width: 100%;
+  height: clamp(96px, 21vh, 164px);
+  max-height: none;
+  aspect-ratio: auto;
+}
+
+/* Con el cronómetro en marcha la figura cede sitio al objetivo, al aviso de
+   montaje y a las series; en pantallas bajas se oculta. */
+body.has-timer .session__figure .anim-fig--grande {
+  height: clamp(80px, 11vh, 96px);
+}
+
+@media (max-height: 699px) {
+  body.has-timer .session__figure {
+    display: none;
+  }
+}
+
+/* Objetivo de la serie */
+.session__target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  row-gap: 0;
+  line-height: 1.2;
+}
+
+.session__target-set {
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.session__target-goal {
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.session__target-weight {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.session__technique {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Series: rejilla de 2 columnas (a 360 px caben "14,75 × 12" y la pastilla) */
+.session__sets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.session__set {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-muted);
+  text-align: left;
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), transform 120ms var(--ease);
+}
+
+.session__set:active {
+  transform: scale(0.97);
+  background: var(--surface-2);
+}
+
+.session__set .set-pill {
+  width: 40px;
+  height: 40px;
+}
+
+.session__set-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 1.3125rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.session__set.is-current {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.session__set.is-current .session__set-text {
+  font-weight: 700;
+}
+
+.session__set.is-done {
+  border-color: rgba(198, 244, 50, 0.35);
+  color: var(--text);
+}
+
+/* Cada repintado recrea las pastillas: solo rebota la serie recién hecha
+   (la que va justo antes de la actual), no todas las hechas. */
+.session__sets .set-pill.is-done,
+.session__sets .set-pill.is-done::after {
+  animation: none;
+}
+
+.session__sets li:has(+ li > .is-current) > .is-done > .set-pill {
+  animation: pill-bounce 480ms var(--ease-bounce);
+}
+
+.session__sets li:has(+ li > .is-current) > .is-done > .set-pill::after {
+  animation: check-in 320ms 120ms var(--ease) both;
+}
+
+/* Acciones pegajosas abajo: SIEMPRE visibles sobre la tabbar y la franja .timer */
+.session__actions {
+  position: sticky;
+  z-index: 5;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: auto calc(-1 * var(--space-4)) 0; /* auto arriba: siempre al fondo */
+  /* Abajo se reserva SIEMPRE el hueco de la franja compacta del cronómetro:
+     "Serie hecha" está en el mismo sitio con y sin descanso, y la franja
+     aparece debajo (encima de este relleno), nunca donde estaba el botón. */
+  padding: var(--space-5) var(--space-4) calc(var(--space-3) + var(--timer-h-session));
+  background: linear-gradient(to bottom, rgba(15, 17, 21, 0) 0, var(--bg) var(--space-5));
+  /* El degradado superior no roba toques a las series que asoman por detrás */
+  pointer-events: none;
+}
+
+.session__actions > * {
+  pointer-events: auto;
+}
+
+/* El hueco inferior de .app__main lo ocupan ya las acciones (con la franja
+   reservada): sin margen extra, el último contenido queda justo encima de
+   ellas y nada "salta" al final ni al aparecer el cronómetro. */
+.app__main:has(.screen.is-active .session__actions),
+body.has-timer .app__main:has(.screen.is-active .session__actions) {
+  padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom));
+}
+
+/* Franja del cronómetro compacta dentro de la sesión: una sola fila de alto
+   fijo (anillo 48 px | etiqueta | −15 s +15 s Saltar). El modo ampliado y la
+   franja fuera de la sesión no cambian. */
+body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) {
+  --ring-size: 48px;
+  grid-template-columns: var(--ring-size) minmax(0, 1fr) auto;
+  grid-template-areas: "ring info actions";
+  column-gap: var(--space-2);
+  row-gap: 0;
+  height: var(--timer-h-session);
+  padding-block: var(--space-2);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) .timer__time {
+  font-size: 1rem;
+}
+
+body:has(.screen.is-active .session__actions) .timer.is-prep:not(.is-expanded) .timer__time {
+  font-size: 1.375rem;
+}
+
+body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) .timer__label {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+}
+
+/* En una fila no cabe el "Siguiente: …" (quedaba en "Siguiente:…"); la propia
+   pantalla de la sesión ya muestra el ejercicio y el aviso de montaje. */
+body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) .timer__next {
+  display: none;
+}
+
+body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) .timer__actions {
+  grid-template-columns: repeat(3, auto);
+  gap: var(--space-1);
+}
+
+body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) .timer__btn {
+  min-height: 48px;
+  min-width: 48px;
+  padding-inline: var(--space-2);
+  font-size: 0.9375rem;
+}
+
+/* En la sesión, los avisos salen arriba para no tapar "Serie hecha" */
+body:has(.screen.is-active .session__actions) .toast {
+  top: calc(var(--safe-top) + var(--space-3));
+  bottom: auto;
+}
+
+.session__start {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.session__quick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.session__quick-label {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.session__quick .stepper {
+  flex: none;
+}
+
+.session__quick .stepper > output {
+  min-width: 64px;
+}
+
+.session__done {
+  min-height: 72px;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 6px 20px rgba(198, 244, 50, 0.18);
+}
+
+/* ---- Resumen ---- */
+.session__summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.session__stats {
+  display: grid;
+  /* El volumen ("3090,25") se queda todo el ancho que sobra */
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.session__stats .stat__value {
+  font-size: clamp(1.75rem, 9vw, 2.5rem);
+  overflow-wrap: anywhere;
+}
+
+.session__summary-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.session__summary-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.session__summary-name {
+  min-width: 0;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.session__summary-item > .muted {
+  flex: none;
+  font-size: 0.9375rem;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.session__progression {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgba(198, 244, 50, 0.45);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.session__home {
+  min-height: 64px;
+  margin-top: var(--space-2);
+  font-size: 1.1875rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session__set:active,
+  .session__done:active {
+    transform: none;
+  }
 }

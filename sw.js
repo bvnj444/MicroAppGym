@@ -5,7 +5,7 @@
  * Rutas relativas a este archivo: funciona en la raíz y en /repo/ de GitHub Pages.
  */
 
-const CACHE = 'gym-v7';
+const CACHE = 'gym-v8';
 
 const ARCHIVOS = [
   './',
@@ -23,11 +23,13 @@ const ARCHIVOS = [
   './js/planner.js',
   './js/animations.js',
   './js/timer.js',
+  './js/workout.js',
   './js/data/exercises.js',
   './js/data/routines.js',
   './js/data/equipment.js',
   './js/views/hoy.js',
   './js/views/rutina.js',
+  './js/views/sesion.js',
   './js/views/ejercicios.js',
   './js/views/historial.js',
   './js/views/config.js',

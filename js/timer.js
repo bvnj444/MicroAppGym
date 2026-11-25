@@ -49,6 +49,9 @@
  *   Se borra al cerrar el cronómetro. Al reabrir la app sigue la cuenta o muestra
  *   "Descanso terminado hace X s" (si terminó hace más de 15 min se descarta).
  *
+ * Doble toque: durante 600 ms tras mostrarse la franja o cambiar de forma (descanso/libre,
+ * preparación, terminado) se ignoran los toques en −15 s, +15 s y Saltar.
+ *
  * Marcado (estilos de disenador-ui): <section class="timer"> con estados is-expanded,
  * is-warning (≤ 10 s), is-done, is-free, is-prep; <div class="flash"> con is-on ~1,2 s;
  * body.has-timer mientras la franja se ve.
@@ -843,6 +846,9 @@ function asegurarUI() {
     if (!b) return;
     if (b === ui.anillo) { ampliar(!estaAmpliado()); return; }
     const accion = b.dataset.timer;
+    // Recién mostrada la franja (o recién cambiados sus botones): se ignora el toque, que
+    // suele ser el segundo de un doble toque en "✓ Serie hecha" que acaba de quedar debajo.
+    if (accion && ahoraMono() < bloqueoHasta) return;
     if (accion === 'menos') nucleo.ajustar(-15);
     else if (accion === 'mas') nucleo.ajustar(15);
     else if (accion === 'saltar') nucleo.saltar();
@@ -876,8 +882,18 @@ function ampliar(si, { desdeHistorial = false } = {}) {
   } catch (e) { /* sin historial: se reduce igual con el anillo o Escape */ }
 }
 
+// Toques ignorados en −15/+15/Saltar durante BLOQUEO_TOQUE_MS tras mostrarse la franja o
+// cambiar su forma (descanso/libre, preparación, terminado).
+const BLOQUEO_TOQUE_MS = 600;
+let bloqueoHasta = 0;
+let formaVista = '';
+const ahoraMono = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+const bloquearToques = () => { bloqueoHasta = ahoraMono() + BLOQUEO_TOQUE_MS; };
+
 function mostrar(si) {
   if (!ui) return;
+  if (si && ui.seccion.hidden) bloquearToques();
+  if (!si) formaVista = '';
   ui.seccion.hidden = !si;
   document.body.classList.toggle('has-timer', si);
   if (!si) {
@@ -913,6 +929,11 @@ function pintar() {
   if (!e.visible) return;
   const c = ui.seccion.classList;
   const libre = e.modo === 'libre';
+  const forma = `${e.modo}|${e.fase === 'prep'}|${e.terminado}`;
+  if (forma !== formaVista) {
+    if (formaVista) bloquearToques();
+    formaVista = forma;
+  }
   c.toggle('is-free', libre);
   c.toggle('is-prep', e.fase === 'prep');
   c.toggle('is-done', e.terminado);
