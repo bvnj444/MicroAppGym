@@ -1,12 +1,15 @@
 /*
  * Pantalla Hoy (inicio).
- * Entrenamiento de hoy (o descanso y próximo entrenamiento), la semana real,
- * las sesiones terminadas (la racha real llega en la Fase 7), retomar una sesión
- * a medias y el acceso a Ajustes. Usa ctx.obtenerRutina() y planner.js.
+ * Entrenamiento de hoy (o descanso y próximo entrenamiento), la racha real con su récord
+ * (progress.calcularRacha, PLAN §9.8), la semana real, retomar una sesión a medias y el
+ * acceso a Ajustes. Usa ctx.obtenerRutina(), planner.js y progress.js.
+ * El récord mostrado es max(calculado, meta.rachaRecord) y se guarda en meta cuando sube, así no
+ * baja si cambian los días marcados (que reinterpretan el pasado).
  * (Las aperturas de la app se registran en CLAVES.meta desde app.js.)
  */
 
 import * as planner from '../planner.js';
+import { calcularRacha } from '../progress.js';
 
 const LETRAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const NOMBRES_DIA = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
@@ -86,6 +89,39 @@ function tarjetaDescanso(proximo, hoyTexto) {
       </article>`;
 }
 
+/** Racha actual y récord (guarda meta.rachaRecord si sube). */
+function datosRacha(storage, terminadas, config, rutina, hoyTexto) {
+  let r;
+  try {
+    r = calcularRacha(terminadas, config, rutina, hoyTexto);
+  } catch (e) {
+    console.error('[hoy] No se pudo calcular la racha', e);
+    return null;
+  }
+  const meta = storage.get(storage.CLAVES.meta, {}) || {};
+  const guardado = Number(meta.rachaRecord) || 0;
+  const record = Math.max(guardado, r.record, r.actual);
+  if (record > guardado) storage.set(storage.CLAVES.meta, { ...meta, rachaRecord: record });
+  return { ...r, record };
+}
+
+function tarjetaRacha(racha, diaHoy) {
+  const n = racha.actual;
+  const titulo = n === 0
+    ? 'Empieza tu racha hoy'
+    : `<strong>${n}</strong> ${n === 1 ? 'entrenamiento seguido' : 'entrenamientos seguidos'} sin fallar`;
+  const pendiente = racha.hoyPendiente && diaHoy
+    ? `<p class="hoy-racha__pending">Hoy toca ${diaHoy.nombre}: ${n > 0 ? '¡no la pierdas!' : '¡a por ella!'}</p>`
+    : '';
+  return `
+      <section class="card hoy-racha" aria-labelledby="hoy-racha-titulo">
+        <h2 class="sr-only" id="hoy-racha-titulo">Racha</h2>
+        <p class="streak hoy-racha__streak">${titulo}</p>
+        ${racha.record > 0 ? `<p class="muted hoy-racha__record">Récord: ${racha.record}</p>` : ''}
+        ${pendiente}
+      </section>`;
+}
+
 function pintarSemana(dias, hoyTexto, fechasHechas) {
   return dias.map((d, i) => {
     const clases = ['week__day'];
@@ -121,6 +157,7 @@ export function render(contenedor, ctx) {
 
   let principal;
   let semanaHtml = '';
+  let rachaHtml = '';
   if (!rutina) {
     principal = `
       <article class="card card--highlight">
@@ -139,15 +176,13 @@ export function render(contenedor, ctx) {
     const dias = planner.semana(rutina, config, hoyTexto);
     const previstos = dias.filter((d) => !d.descanso).length;
     const hechos = dias.filter((d) => fechasHechas.has(d.fecha)).length;
-    const n = terminadas.length;
+    const racha = datosRacha(storage, terminadas, config, rutina, hoyTexto);
+    if (racha) rachaHtml = tarjetaRacha(racha, dia);
     semanaHtml = `
       <section class="card stack" aria-labelledby="hoy-semana">
         <h2 class="card__title" id="hoy-semana">Esta semana</h2>
         <ol class="week">${pintarSemana(dias, hoyTexto, fechasHechas)}</ol>
         <p class="muted">${hechos} de ${previstos} entrenamientos hechos esta semana</p>
-        <p class="streak">${n === 0
-          ? 'Empieza tu racha hoy'
-          : `<strong>${n}</strong> ${n === 1 ? 'sesión terminada' : 'sesiones terminadas'}`}</p>
       </section>`;
   }
 
@@ -170,6 +205,7 @@ export function render(contenedor, ctx) {
         <button type="button" class="btn btn--secondary btn--block" data-accion="retomar">Retomar sesión</button>
       </div>` : ''}
       ${principal}
+      ${rachaHtml}
       ${semanaHtml}
     </div>
   `;

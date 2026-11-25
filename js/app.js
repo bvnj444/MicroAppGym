@@ -30,11 +30,18 @@
  *
  * Arranque: si la configuración no está terminada (configurado === false) se abre
  * Ajustes en modo "Configuración inicial"; la barra de pestañas sigue visible.
+ *
+ * Avisos de racha (js/notificaciones.js): al arrancar, al volver a la app otro día, tras
+ * 'mag:config' y tras guardar la rutina se reescriben los datos del recordatorio que lee el
+ * service worker (Cache Storage 'mag-datos'); al arrancar se ajusta el registro de Periodic
+ * Background Sync y, como respaldo, se enseña el aviso del día. Al tocar una notificación,
+ * sw.js enfoca la app y le manda { tipo: 'mag-navegar', ruta: 'hoy' }.
  */
 
 import * as storage from './storage.js';
 import { kg } from './data/equipment.js';
 import * as planner from './planner.js';
+import * as notif from './notificaciones.js';
 import * as hoy from './views/hoy.js';
 import * as rutina from './views/rutina.js';
 import * as ejercicios from './views/ejercicios.js';
@@ -89,7 +96,53 @@ function fechaLocalHoy() {
 }
 
 function guardarRutina(rutina) {
-  return storage.set(storage.CLAVES.rutina, rutina);
+  const ok = storage.set(storage.CLAVES.rutina, rutina);
+  if (ok) programarDatosRecordatorio();
+  return ok;
+}
+
+/* ---------- Avisos de racha ---------- */
+
+let temporizadorDatos = 0;
+/** Reescribe (agrupando cambios seguidos) los datos que usa el recordatorio del service worker. */
+function programarDatosRecordatorio() {
+  clearTimeout(temporizadorDatos);
+  temporizadorDatos = setTimeout(() => { notif.actualizarDatos(storage, fechaLocalHoy()); }, 300);
+}
+
+let ultimoDiaAviso = null;
+async function avisoDelDia() {
+  const hoy = fechaLocalHoy();
+  if (ultimoDiaAviso === hoy) return;
+  ultimoDiaAviso = hoy;
+  await notif.actualizarDatos(storage, hoy);
+  const texto = await notif.avisoAlAbrir(storage, hoy);
+  if (texto) mostrarToast(texto, 6000);
+}
+
+function iniciarAvisosRacha() {
+  window.addEventListener('mag:config', programarDatosRecordatorio);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') avisoDelDia();
+  });
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (evento) => {
+      const datos = evento.data;
+      if (!datos || datos.tipo !== 'mag-navegar') return;
+      const ruta = Object.hasOwn(VISTAS, datos.ruta) ? datos.ruta : RUTA_INICIAL;
+      if (storage.getConfig().configurado !== true) return;
+      if (ruta === rutaActual) mostrar(ruta); // repinta (la racha puede haber cambiado)
+      else ctx.navegar(ruta);
+    });
+    try { navigator.serviceWorker.startMessages(); } catch { /* ya activado */ }
+  }
+  // Tras la carga: no compite con la primera pintura y el service worker ya está registrado.
+  const tras = () => setTimeout(() => {
+    avisoDelDia();
+    notif.sincronizarPeriodico(storage);
+  }, 600);
+  if (document.readyState === 'complete') tras();
+  else window.addEventListener('load', tras, { once: true });
 }
 
 /** Días de la semana (ISO, ordenados) en los que cae la rutina. */
@@ -257,6 +310,8 @@ async function arrancar() {
   };
   window.addEventListener('popstate', alCambiarHistorial);
   window.addEventListener('hashchange', alCambiarHistorial);
+
+  iniciarAvisosRacha();
 
   // Primera vez: se abre Ajustes en modo "Configuración inicial".
   const ruta = storage.getConfig().configurado === true ? rutaDesdeHash() : 'ajustes';

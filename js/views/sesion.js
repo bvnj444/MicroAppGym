@@ -17,6 +17,10 @@
  *  - Si termina en otra pantalla: aviso breve y el resumen se ve una vez al volver a #sesion
  *    (CLAVES.meta.resumenPendiente = id de la sesión).
  *
+ * Fase 7 (js/cierre-sesion.js): archivarSesion calcula y APLICA la progresión, guarda
+ * `progresion` en el registro y lanza el aviso de racha; el resumen la pinta en [data-progresion]
+ * con el botón "Deshacer cambios de progresión".
+ *
  * Exporta además, para rutina.js: archivarSesion(storage, sesion) ("Empezar de nuevo") y
  * leerSesionActiva(storage) (valida la sesión guardada y aparta la corrupta).
  * Clases nuevas: prefijo .session (ver el informe de la Fase 6), sin estilos en línea salvo las
@@ -28,6 +32,7 @@ import * as planner from '../planner.js';
 import * as w from '../workout.js';
 import { htmlFigura, pausarFiguras } from '../animations.js';
 import { calcularMontaje, textoMontaje, kg } from '../data/equipment.js';
+import { prepararCierre, completarCierre, htmlProgresion, puedeDeshacer, deshacerProgresion } from '../cierre-sesion.js';
 import {
   desbloquearAudio, iniciarDescanso, iniciarLibre, detener, alTerminar, alCambiar,
   estado as estadoCronometro,
@@ -71,14 +76,32 @@ const guardar = (s) => storage.set(storage.CLAVES.sesionActiva, s);
 const config = () => (vista && vista.ctx.config ? vista.ctx.config() : storage.getConfig());
 const toast = (m) => vista && vista.ctx.toast && vista.ctx.toast(m);
 
-/** Mueve la sesión (terminada) a CLAVES.sesiones y deja sesionActiva a null. true si se guardó. */
+/**
+ * Mueve la sesión (terminada) a CLAVES.sesiones y deja sesionActiva a null. Devuelve la sesión
+ * guardada (con `progresion`) o null. Único punto de cierre: aquí se aplica la progresión
+ * (una sola vez por sesión), se actualiza la racha y se avisa (js/cierre-sesion.js).
+ */
 export function archivarSesion(st, sesion, ahora = Date.now()) {
-  const fin = sesion.terminada ? sesion : w.terminar(sesion, ahora);
+  const terminada = sesion.terminada ? sesion : w.terminar(sesion, ahora);
   const lista = st.get(st.CLAVES.sesiones, []);
-  const nuevas = (Array.isArray(lista) ? lista : []).filter((s) => !s || s.id !== fin.id);
+  const guardadas = Array.isArray(lista) ? lista : [];
+  let cierre;
+  try {
+    cierre = prepararCierre(st, terminada, guardadas, ahora);
+  } catch (e) {
+    console.error('[sesion] No se pudo calcular la progresión', e);
+    cierre = { sesion: terminada, nuevo: false };
+  }
+  const fin = cierre.sesion;
+  const nuevas = guardadas.filter((s) => !s || s.id !== fin.id);
   nuevas.push(fin);
   if (!st.set(st.CLAVES.sesiones, nuevas)) return null;
   st.set(st.CLAVES.sesionActiva, null);
+  try {
+    completarCierre(st, cierre, ahora);
+  } catch (e) {
+    console.error('[sesion] No se pudo completar el cierre', e);
+  }
   return fin;
 }
 
@@ -440,11 +463,34 @@ function pintarResumen(contenedor, ctx, sesion, celebrar) {
     resumenVisible = null;
     ctx.navegar('hoy');
   });
+  pintarProgresion(contenedor, sesion);
   if (celebrar) {
     lanzarConfeti();
     const titulo = contenedor.querySelector('.screen__title');
     if (titulo) { titulo.setAttribute('tabindex', '-1'); titulo.focus(); }
   }
+}
+
+/** Racha, nuevas marcas y cambios de progresión guardados en la sesión (Fase 7). */
+function pintarProgresion(contenedor, sesion) {
+  const hueco = contenedor.querySelector('[data-progresion]');
+  if (!hueco) return;
+  const html = htmlProgresion(sesion.progresion, { deshacer: puedeDeshacer(storage, sesion) });
+  hueco.innerHTML = html ? `<h2 class="card__title" tabindex="-1">Progresión</h2>${html}` : '';
+  hueco.hidden = !html;
+  hueco.querySelector('[data-accion="deshacer-progresion"]')?.addEventListener('click', () => {
+    if (!deshacerProgresion(storage, sesion.id)) {
+      toast('No se puede deshacer: la rutina ha cambiado desde entonces');
+      pintarProgresion(contenedor, sesion);
+      return;
+    }
+    const lista = storage.get(storage.CLAVES.sesiones, []);
+    const fresca = (Array.isArray(lista) ? lista : []).find((s) => s && s.id === sesion.id) || sesion;
+    if (resumenVisible && resumenVisible.id === sesion.id) resumenVisible = fresca;
+    pintarProgresion(contenedor, fresca);
+    toast('Cambios de progresión deshechos');
+    hueco.querySelector('.card__title')?.focus();
+  });
 }
 
 function lanzarConfeti() {

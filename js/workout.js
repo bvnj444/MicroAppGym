@@ -69,6 +69,7 @@
  *   Textos (sirven para un elemento de la rutina o un ejercicio de la sesión):
  *   textoObjetivo(item)                    -> '10–12 reps por pierna' | '30–45 s' | 'Casi al fallo'
  *   textoTecnica(item)                     -> 'Baja en 3 s (tempo 3-1-1) · Pausa 2 s abajo' | ''
+ *                                             (+ textos de los escalones 'lastre' de variantes[0..item.variante])
  *   nombreEjercicio(id)                    -> nombre del catálogo (o el id)
  */
 
@@ -481,6 +482,17 @@ export function textoTecnica(item) {
     const ej = POR_ID.get(item.ejercicioId);
     const paso = ej && (ej.variantes || []).find((v) => v && v.tipo === 'pausa' && v.segundos === item.pausa && v.donde);
     notas.push(`Pausa ${item.pausa} s${paso ? ' ' + paso.donde : ''}`);
+  }
+  // Escalones 'lastre' aplicados (acumulativos): variantes[0..item.variante] del ejercicio.
+  // item.variante = índice del último escalón aplicado (progress.js) o null.
+  const hasta = Number.isInteger(item.variante) ? item.variante : -1;
+  if (hasta >= 0) {
+    const ej = POR_ID.get(item.ejercicioId);
+    const escalera = (ej && ej.variantes) || [];
+    for (let i = 0; i <= hasta && i < escalera.length; i++) {
+      const v = escalera[i];
+      if (v && v.tipo === 'lastre' && v.texto) notas.push(v.texto);
+    }
   }
   return notas.join(' · ');
 }

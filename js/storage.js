@@ -20,9 +20,7 @@
  *   CLAVES.rutina        -> 'mag:rutina'         Rutina generada por planner.js
  *   CLAVES.sesiones      -> 'mag:sesiones'       Array de registros de sesión terminados
  *   CLAVES.sesionActiva  -> 'mag:sesionActiva'   Registro de sesión a medias (o null)
- *   CLAVES.meta          -> 'mag:meta'           Datos internos (aperturas, etc.; resumenPendiente:
- *                                                id de la sesión terminada fuera de la pantalla de sesión,
- *                                                cuyo resumen se muestra una vez al volver a #sesion)
+ *   CLAVES.meta          -> 'mag:meta'           Datos internos (ver META más abajo)
  *   'mag:cronometro'     Estado temporal del cronómetro (timer.js): finEn absoluto, modo, etc.
  *                        No está en CLAVES: no se exporta ni se importa y se borra al cerrarlo.
  *   Copias de datos corruptos: 'mag:corrupto:<clave>:<marca de tiempo>' (texto tal cual).
@@ -44,6 +42,9 @@
  *   avisos: {                        // aviso al terminar el descanso (timer.js)
  *     modo: 'ambos',                 // 'ambos' | 'sonido' | 'vibracion'
  *     pitarBloqueado: false          // audio casi silencioso en bucle para pitar con el móvil bloqueado
+ *   },
+ *   notificaciones: {                // avisos de racha (js/notificaciones.js); se guarda al momento
+ *     racha: false                   // true solo si el usuario lo activó Y concedió el permiso
  *   }
  * }
  *   Ojo: las claves de `inventario` son texto en JSON; conviértelas con Number().
@@ -108,10 +109,42 @@
  *     }
  *   ]
  * }
+ *   + progresion (solo en sesiones terminadas desde la Fase 7; los registros antiguos no lo
+ *     tienen y se aceptan igual). Lo escribe js/cierre-sesion.js UNA sola vez al archivar:
+ *   progresion: {
+ *     version: 1,
+ *     sugerencias: [ ...progress.sugerirProgresion(...) ],  // { diaId, indice, ejercicioId, accion,
+ *                                     //   texto, cambios, peso, pesoAnterior, paso } (ver progress.js)
+ *     marcas: [ ...progress.marcasNuevas(...) ],            // { ejercicioId, tipo, valor, anterior }
+ *     racha: { antes: 6, despues: 7, hito: 5 | null },      // entrenamientos seguidos
+ *     aplicada: true,                // hubo cambios y se guardó la rutina nueva
+ *     deshecha: false                // el usuario pulsó "Deshacer cambios de progresión"
+ *   }
  *   Volumen (workout.resumen): Σ peso × repeticiones de las series hechas; par de
  *   mancuernas ×2; una mancuerna, barra y unilaterales tal cual.
  *   La sesión a medias se guarda en CLAVES.sesionActiva tras CADA serie; al terminar
  *   se añade a CLAVES.sesiones y CLAVES.sesionActiva pasa a null.
+ *
+ * META  (CLAVES.meta; todo opcional)
+ * {
+ *   aperturas: 12, ultimaApertura: ISO,           // app.js
+ *   resumenPendiente: 's-…',          // sesión terminada fuera de #sesion; su resumen se ve una vez
+ *   rachaRecord: 12,                  // récord de racha visto (no baja si se reinterpreta el pasado)
+ *   deshacerProgresion: {             // solo la ÚLTIMA progresión aplicada
+ *     sesionId: 's-…',
+ *     rutina: { ...rutina anterior... },
+ *     huella: 'h1a2b3c'               // huella de la rutina que dejó la progresión: solo se puede
+ *   }                                 // deshacer si la rutina guardada sigue siendo esa
+ * }
+ *
+ * CACHE STORAGE 'mag-datos'  (no es localStorage: lo lee el service worker, que no puede leer
+ *   localStorage; 'activate' no la borra porque no empieza por 'gym-'). Una entrada
+ *   './mag-datos/racha.json' que escribe js/notificaciones.js tras arrancar, terminar una sesión
+ *   o cambiar ajustes:
+ *   { version: 1, activado: boolean, escritoEn: 'AAAA-MM-DD', racha: 7,
+ *     proximos: [{ fecha: 'AAAA-MM-DD', diaNombre: 'Pierna A' }],   // días de entrenamiento, 14 días desde hoy
+ *     entrenadas: ['AAAA-MM-DD', …],    // fechas con sesión terminada (últimos 21 días)
+ *     ultimaNotificada: 'AAAA-MM-DD' | null }  // la escribe también el SW al avisar
  *
  * API
  *   init()                      -> Promise<{ persistente: boolean|null, disponible: boolean }>
@@ -155,6 +188,7 @@ const CONFIG_POR_DEFECTO = Object.freeze({
   tuercas: { porMancuerna: 2, barra: 2 },
   maxDiscosPorLadoMango: 7000,
   avisos: { modo: 'ambos', pitarBloqueado: false },
+  notificaciones: { racha: false },
 });
 
 /*
@@ -278,6 +312,7 @@ export function getConfig() {
     piezas: { ...base.piezas, ...objeto(guardada.piezas) },
     tuercas: { ...base.tuercas, ...objeto(guardada.tuercas) },
     avisos: { ...base.avisos, ...objeto(guardada.avisos) },
+    notificaciones: { ...base.notificaciones, ...objeto(guardada.notificaciones) },
   };
   return validarConfig(config, base);
 }
@@ -307,6 +342,7 @@ function validarConfig(config, base) {
   if (!['ambos', 'sonido', 'vibracion'].includes(config.avisos.modo)) config.avisos.modo = base.avisos.modo;
   config.avisos.pitarBloqueado = config.avisos.pitarBloqueado === true;
   config.avisos = { modo: config.avisos.modo, pitarBloqueado: config.avisos.pitarBloqueado };
+  config.notificaciones = { racha: config.notificaciones.racha === true };
 
   for (const grupo of ['equipo']) {
     for (const k of Object.keys(config[grupo])) {

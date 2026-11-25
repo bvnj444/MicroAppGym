@@ -1,6 +1,6 @@
 # MicroApp Gym — Plan de implementación
 
-> Estado: **Fases 1 a 6 terminadas y revisadas por qa-movil (la Fase 6, pendiente de una sesión real en el Android). Publicada en https://bvnj444.github.io/MicroAppGym/. Siguiente: Fase 7 (historial, progresión, racha y notificaciones).**
+> Estado: **Fases 1 a 7 terminadas y revisadas por qa-movil (la Fase 7, pendiente de probar en el Android las notificaciones de racha). Publicada en https://bvnj444.github.io/MicroAppGym/. Siguiente: Fase 8 (pruebas y pulido).**
 > Última actualización: 23/11/2026 (revisión 2: correcciones de los subagentes experto-ejercicios, logica-entrenamiento y qa-movil)
 
 ---
@@ -482,6 +482,11 @@ Cada fase termina con una revisión de **qa-movil**. Una fase solo está termina
 - Uso sin conexión.
 - Tamaños de pantalla de 360 a 430 px.
 - Accesibilidad y pulido final.
+- Pendientes anotados por qa-movil:
+  - Editar series de ejercicios anteriores de la sesión.
+  - `--timer-h` igual a la altura real de la franja.
+  - Recortar `progresion` en las sesiones antiguas para no llenar localStorage en unos años.
+  - Botones de días de la semana en Ajustes más anchos (ahora 39 px).
 
 **Terminado cuando:**
 - **qa-movil** no informa de ningún problema bloqueante ni importante.

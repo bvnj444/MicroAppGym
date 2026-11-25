@@ -6,10 +6,14 @@
  *  - cambia el número de días -> rutina nueva (con confirmación si ya había una);
  *  - cambian solo los días o el nivel -> planner.reasignarDias, sin preguntar.
  * En la configuración inicial, tras guardar, navega a Hoy.
+ * "Aviso del descanso" y "Avisos de racha" se guardan al momento (evento 'mag:config').
+ * Avisos de racha (js/notificaciones.js): al activarlos se pide el permiso; si se deniega el
+ * interruptor queda apagado y se explica cómo permitirlo en Chrome.
  */
 
 import * as planner from '../planner.js';
 import * as timer from '../timer.js';
+import * as notif from '../notificaciones.js';
 
 const DIAS = [
   [1, 'L', 'lunes'], [2, 'M', 'martes'], [3, 'X', 'miércoles'], [4, 'J', 'jueves'],
@@ -175,6 +179,8 @@ function pintar(contenedor, ctx) {
         <button type="button" class="btn btn--secondary btn--block" data-accion="probar-aviso">Probar aviso</button>
       </section>
 
+      ${inicial ? '' : tarjetaRacha(c)}
+
       <button type="submit" class="btn btn--primary btn--block">${inicial ? 'Crear mi rutina' : 'Guardar ajustes'}</button>
       <button type="button" class="btn btn--ghost btn--block" data-accion="restablecer">Volver a los valores estimados</button>
 
@@ -191,9 +197,92 @@ function pintar(contenedor, ctx) {
   conectar(contenedor, ctx);
 }
 
+const TEXTO_BLOQUEADO = 'Las notificaciones están bloqueadas para esta app. Para permitirlas: mantén pulsado el icono de MicroApp Gym → Información de la app → Notificaciones → Permitir (en Chrome sin instalar: candado junto a la dirección → Permisos → Notificaciones). Después vuelve a activar este interruptor.';
+
+function tarjetaRacha(c) {
+  const p = notif.permiso();
+  const activo = c.notificaciones.racha === true && p === 'granted';
+  let estado = '';
+  if (p === 'no-disponible') estado = 'Este navegador no permite notificaciones (hace falta Chrome con HTTPS o localhost).';
+  else if (p === 'denied') estado = TEXTO_BLOQUEADO;
+  return `
+      <section class="card stack" aria-label="Avisos de racha">
+        <h2 class="card__title">Avisos de racha</h2>
+        <p class="card__meta">Al terminar una sesión, al llegar a un hito y, en tus días de entrenamiento, un recordatorio si aún no has entrenado.</p>
+        <label class="row cfg-switch">
+          <input type="checkbox" role="switch" data-accion="avisos-racha"${activo ? ' checked' : ''}${p === 'no-disponible' ? ' disabled' : ''}>
+          <span>Avisos de racha</span>
+        </label>
+        <p class="muted" data-racha-estado${estado ? '' : ' hidden'}>${estado}</p>
+        <p class="muted" data-racha-periodico${activo ? '' : ' hidden'}>Comprobando el recordatorio…</p>
+        <p class="muted">El recordatorio de los días de entrenamiento llega a una hora aproximada (lo decide Chrome). La hora exacta llegará con la app para Android (Fase 9).</p>
+        <button type="button" class="btn btn--secondary btn--block" data-accion="probar-notificacion"${p === 'no-disponible' ? ' disabled' : ''}>Probar notificación</button>
+      </section>`;
+}
+
+const TEXTO_PERIODICO = {
+  registrado: 'Recordatorio de los días de entrenamiento: activado.',
+  'sin-registrar': 'Recordatorio de los días de entrenamiento: activado.',
+  'sin-permiso': 'Chrome aún no permite el recordatorio en segundo plano (suele hacerlo con la app instalada y usada a menudo). Mientras tanto, el aviso sale al abrir la app ese día.',
+  'no-disponible': 'El recordatorio en segundo plano no está disponible en este navegador. El aviso sale al abrir la app ese día.',
+};
+
+async function pintarEstadoPeriodico(contenedor, estadoYa = null) {
+  const p = contenedor.querySelector('[data-racha-periodico]');
+  if (!p || p.hidden) return;
+  const estado = estadoYa || await notif.estadoPeriodico();
+  if (p.isConnected) p.textContent = TEXTO_PERIODICO[estado] || TEXTO_PERIODICO['no-disponible'];
+}
+
+function conectarRacha(contenedor, ctx) {
+  const interruptor = contenedor.querySelector('[data-accion="avisos-racha"]');
+  if (!interruptor) return;
+  pintarEstadoPeriodico(contenedor);
+
+  interruptor.addEventListener('change', async () => {
+    interruptor.disabled = true;
+    let periodico = null;
+    if (interruptor.checked) {
+      const p = await notif.pedirPermiso();
+      if (p !== 'granted') {
+        guardarNotificaciones(ctx, { racha: false });
+        ctx.toast(p === 'denied' ? 'Permiso denegado: los avisos siguen apagados.' : 'Sin permiso: los avisos siguen apagados.', 4000);
+      } else {
+        guardarNotificaciones(ctx, { racha: true });
+        periodico = await notif.registrarPeriodico();
+        ctx.toast('Avisos de racha activados.');
+      }
+    } else {
+      guardarNotificaciones(ctx, { racha: false });
+      await notif.desregistrarPeriodico();
+      ctx.toast('Avisos de racha desactivados.');
+    }
+    notif.actualizarDatos(ctx.storage, ctx.hoy());
+    if (!contenedor.contains(interruptor)) return;
+    pintar(contenedor, ctx);
+    if (periodico) pintarEstadoPeriodico(contenedor, periodico);
+    contenedor.querySelector('[data-accion="avisos-racha"]')?.focus();
+  });
+
+  contenedor.querySelector('[data-accion="probar-notificacion"]').addEventListener('click', async () => {
+    const p = await notif.pedirPermiso();
+    if (p !== 'granted') {
+      ctx.toast(p === 'denied' ? 'Las notificaciones están bloqueadas: mira cómo permitirlas en esta tarjeta.' : 'Sin permiso para notificar.', 4500);
+      pintar(contenedor, ctx);
+      return;
+    }
+    const ok = await notif.mostrar('🔥 Así se verán tus avisos de racha', {
+      body: 'Tócala para abrir la pantalla Hoy.',
+      tag: 'mag-prueba',
+    });
+    if (!ok) ctx.toast('No se ha podido mostrar la notificación.');
+  });
+}
+
 function conectar(contenedor, ctx) {
   const { storage } = ctx;
   const form = contenedor.querySelector('form');
+  conectarRacha(contenedor, ctx);
 
   contenedor.querySelector('[data-accion="volver"]')?.addEventListener('click', () => ctx.volver());
 
@@ -313,7 +402,10 @@ function conectar(contenedor, ctx) {
   contenedor.querySelector('[data-accion="restablecer"]').addEventListener('click', () => {
     const base = storage.configPorDefecto();
     // Los avisos se guardan al momento y no son "valores estimados": se conservan.
-    borrador = { ...base, configurado: borrador.configurado, fechaInicio: borrador.fechaInicio, avisos: borrador.avisos };
+    borrador = {
+      ...base, configurado: borrador.configurado, fechaInicio: borrador.fechaInicio,
+      avisos: borrador.avisos, notificaciones: borrador.notificaciones,
+    };
     pintar(contenedor, ctx);
     ctx.toast('Valores estimados puestos. Pulsa Guardar para aplicarlos.');
   });
@@ -346,6 +438,8 @@ function conectar(contenedor, ctx) {
       if (resultado.ok) {
         borrador = storage.getConfig();
         pintar(contenedor, ctx);
+        // Rehace los datos del recordatorio (mag-datos) y el registro periódico con lo importado.
+        window.dispatchEvent(new CustomEvent('mag:config'));
         ctx.toast('Datos importados.');
       } else {
         ctx.toast(resultado.error, 4500);
@@ -365,6 +459,17 @@ function guardarAvisos(ctx, avisos) {
   const guardada = ctx.storage.getConfig();
   if (!ctx.storage.setConfig({ ...guardada, avisos })) {
     ctx.toast('No se ha podido guardar el aviso.');
+    return;
+  }
+  window.dispatchEvent(new CustomEvent('mag:config'));
+}
+
+/** Los avisos de racha también se guardan al momento. */
+function guardarNotificaciones(ctx, notificaciones) {
+  borrador.notificaciones = notificaciones;
+  const guardada = ctx.storage.getConfig();
+  if (!ctx.storage.setConfig({ ...guardada, notificaciones })) {
+    ctx.toast('No se ha podido guardar el ajuste de avisos.');
     return;
   }
   window.dispatchEvent(new CustomEvent('mag:config'));
