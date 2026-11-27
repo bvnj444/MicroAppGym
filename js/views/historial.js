@@ -59,7 +59,7 @@ function minutos(sesion) {
   return Number.isFinite(ms) && ms > 0 ? Math.max(1, Math.round(ms / 60000)) : null;
 }
 
-const kgCorto = (g) => kg(g).replace(' kg', '');
+const kgCorto = (g) => kg(g).replace(/\s*kg$/, '');
 const volumenKg = (g) => `${formatoNumero.format(g / 1000)} kg`;
 
 function sesionesTerminadas(storage) {
@@ -308,12 +308,12 @@ function vistaMarcas(sesiones) {
   const filas = ids.map((id) => {
     const m = marcas[id];
     const lineas = [];
-    if (m.pesoMax) lineas.push(`Peso máximo: <strong>${esc(kg(m.pesoMax.peso))}</strong> × ${m.pesoMax.repeticiones} · ${esc(fechaCorta(m.pesoMax.fecha))}`);
+    if (m.pesoMax) lineas.push(`Peso máximo: <strong>${esc(kg(m.pesoMax.peso))}</strong> × ${esc(m.pesoMax.repeticiones)} · ${esc(fechaCorta(m.pesoMax.fecha))}`);
     if (m.repsMax && !m.segundosMax) {
       const con = m.repsMax.peso > 0 ? ` con ${esc(kg(m.repsMax.peso))}` : '';
-      lineas.push(`Más repeticiones: <strong>${m.repsMax.repeticiones}</strong>${con} · ${esc(fechaCorta(m.repsMax.fecha))}`);
+      lineas.push(`Más repeticiones: <strong>${esc(m.repsMax.repeticiones)}</strong>${con} · ${esc(fechaCorta(m.repsMax.fecha))}`);
     }
-    if (m.segundosMax) lineas.push(`Más tiempo: <strong>${m.segundosMax.segundos} s</strong> · ${esc(fechaCorta(m.segundosMax.fecha))}`);
+    if (m.segundosMax) lineas.push(`Más tiempo: <strong>${esc(m.segundosMax.segundos)} s</strong> · ${esc(fechaCorta(m.segundosMax.fecha))}`);
     if (!lineas.length) return '';
     return `
         <li class="list__item hist-record">

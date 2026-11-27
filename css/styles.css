@@ -71,6 +71,13 @@
                              .hist-record__line .chart .chart__svg .chart__grid
                              .chart__base .chart__axis .chart__line .chart__dot
                              (--last) .chart__label .chart__hint .cfg-switch
+   ---------------------------------------------------------------------
+   TEXTO GRANDE / PANTALLA ESTRECHA (Fase 8; sin clases nuevas en el HTML)
+   - .stepper es una rejilla [−][valor][+]: los botones no encogen y cede el
+     valor; a <= 300 px de viewport (texto al 150-200 %) botones de 44 px.
+   - .tabbar__label se oculta a la vista (no al lector) si no cabe "Ejercicios".
+   - .list__title: hasta 2 líneas. .list__item.is-disabled: apagado sin opacidad.
+   - Sesión a <= 699 px de alto: objetivo y pastillas antes que la figura (80 px).
    ===================================================================== */
 
 /* ---------- 0. Variables ---------- */
@@ -103,8 +110,10 @@
 
   --tap: 56px;
   --tabbar-h: 64px;
-  --timer-h: 160px; /* alto de la franja .timer (anillo + botones) */
-  --timer-h-session: 76px; /* franja compacta de una fila dentro de la sesión */
+  /* Alto de la franja .timer: 12 + 64 (anillo) + 12 + 56 (botones) + 12 + 2 (borde).
+     timer.js lo sustituye por el alto medido (ResizeObserver), p. ej. con texto al 200 %. */
+  --timer-h: 158px;
+  --timer-h-session: 76px; /* franja compacta de la sesión (= su min-height; también medido) */
   --max-w: 430px;
 
   --safe-top: env(safe-area-inset-top, 0px);
@@ -300,6 +309,14 @@ a {
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.02em;
+  overflow-wrap: break-word;
+}
+
+/* El bloque de texto de la cabecera puede encoger: el botón de icono
+   (.screen__action) nunca se sale ni se recorta, ni con el texto al 200 %. */
+.screen__header > :not(.screen__action) {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .screen__subtitle {
@@ -419,6 +436,33 @@ a {
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+}
+
+/* Con el texto muy grande (o una pantalla muy estrecha) "Ejercicios" no cabe
+   en su pestaña: se quedan solo los iconos, más grandes. La etiqueta sigue en
+   el árbol de accesibilidad (oculta como .sr-only), así que el enlace conserva
+   su nombre. La consulta usa em: sigue al tamaño del texto. */
+.tabbar__item {
+  container-type: inline-size;
+}
+
+@container (max-width: 4.6rem) {
+  .tabbar__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .tabbar__icon {
+    width: 30px;
+    height: 30px;
+  }
 }
 
 /* ---------- 5. Tarjetas ---------- */
@@ -637,6 +681,12 @@ a {
   gap: var(--space-1);
 }
 
+/* Semana con botones (Rutina): 2 px de separación para que cada día mida
+   >= 44 px de ancho a 360 px (45 px; 56 px a 430). */
+.week:has(> button) {
+  gap: 2px;
+}
+
 .week__day {
   position: relative;
   display: flex;
@@ -687,9 +737,10 @@ a {
 }
 
 .week__day.is-rest {
+  /* Descanso: borde discontinuo y sin fondo, sin opacidad (que bajaba el
+     contraste de las letras a 3,3:1). --text-muted sobre --bg = 7,6:1. */
   background: transparent;
   border-style: dashed;
-  opacity: 0.6;
 }
 
 .week__day.is-rest strong,
@@ -824,12 +875,17 @@ a.list__item:active,
 }
 
 .list__title {
+  /* Hasta 2 líneas: los nombres largos ("Hip thrust con barra (hombros en el
+     sofá)") se leen enteros en casi todos los casos; si no, "…" al final. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
+  overflow-wrap: break-word;
   font-size: 1rem;
   font-weight: 600;
   line-height: 1.3;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .list__meta {
@@ -1408,15 +1464,34 @@ body.has-timer:has(.timer.is-expanded:not([hidden])) {
   outline-color: var(--text);
 }
 
-/* Selector de 6 o más opciones (días L…D): menos relleno para que cada botón
-   tenga al menos ~44 px de ancho a 360 px. */
+/* Selector de 6 o más opciones (días L…D): fila de 7 baldosas sin marco y, dentro
+   de una tarjeta, casi hasta su borde (2 px), para que cada botón mida >= 44 px de
+   ancho a 360 px (≈44 px a 360, ≈55 px a 430). El foco se dibuja hacia dentro
+   para que no lo tape la baldosa vecina. */
 .segmented:has(> .segmented__option:nth-child(6)) {
   gap: 2px;
-  padding: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.card .segmented:has(> .segmented__option:nth-child(6)) {
+  margin-inline: calc(2px - var(--space-4));
 }
 
 .segmented:has(> .segmented__option:nth-child(6)) .segmented__option {
   padding: 0;
+  background: var(--surface-2);
+  font-size: 1.0625rem;
+}
+
+.segmented:has(> .segmented__option:nth-child(6)) .segmented__option.is-selected {
+  background: var(--accent);
+}
+
+.segmented:has(> .segmented__option:nth-child(6)) .segmented__option:focus-visible {
+  outline-offset: -3px;
+  border-radius: 10px;
 }
 
 /* Opción que no se puede elegir ahora (por ejemplo, ya hay bastantes días). */
@@ -1426,14 +1501,8 @@ body.has-timer:has(.timer.is-expanded:not([hidden])) {
 
 /* Stepper dentro de un campo: ocupa todo el ancho y el valor se centra. */
 .field > .stepper {
-  display: flex;
+  display: grid;
   width: 100%;
-}
-
-.field > .stepper > output,
-.field > .stepper > span,
-.field > .stepper > input {
-  flex: 1;
 }
 
 /* Casillas de verificación dentro de una fila: sin saltar de línea y con
@@ -1452,14 +1521,65 @@ label.row > input[type="checkbox"] {
   accent-color: var(--accent);
 }
 
+/* Opción desactivada: texto en gris sin opacidad (AA >= 4,5:1); solo la
+   casilla se apaga. */
 label.row:has(> input:disabled) {
   cursor: not-allowed;
-  opacity: 0.6;
+  color: var(--text-muted);
 }
 
+label.row > input[type="checkbox"]:disabled {
+  opacity: 0.5;
+}
+
+/* El texto de la fila puede partirse (texto al 200 %: "(próximamente)"). */
+label.row > :not(input) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Texto al 150-200 % (viewport <= 300 px): los selectores de 7 días pasan a
+   varias filas para que cada día mida >= 44 px, y los títulos encogen un
+   poco para no partir palabras cortas ("Ajustes"). */
+@media (max-width: 300px) {
+  .segmented {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fit, minmax(4rem, 1fr));
+  }
+
+  .segmented__option {
+    padding-inline: 2px;
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+  }
+
+  .segmented:has(> .segmented__option:nth-child(6)),
+  .week:has(> button) {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    gap: var(--space-1);
+  }
+
+  .card .segmented:has(> .segmented__option:nth-child(6)) {
+    margin-inline: 0;
+  }
+
+  .screen__title {
+    font-size: 1.375rem;
+  }
+
+  .sheet__title {
+    font-size: 1.0625rem;
+  }
+}
+
+/* Rejilla [−][valor][+]: los botones nunca encogen ni se recortan; si falta
+   sitio cede el valor (minmax(0, 1fr)) y el stepper no pasa del 100 %. */
 .stepper {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: stretch;
+  max-width: 100%;
   min-height: var(--tap);
   overflow: hidden;
   border: 1px solid var(--border);
@@ -1478,7 +1598,7 @@ label.row:has(> input:disabled) {
   border: 0;
   background: transparent;
   color: var(--accent);
-  font-size: 1.6rem;
+  font-size: min(1.6rem, 34px);
   font-weight: 600;
   line-height: 1;
   transition: background-color var(--dur) var(--ease);
@@ -1524,6 +1644,25 @@ label.row:has(> input:disabled) {
 .stepper > input {
   -moz-appearance: textfield;
   appearance: textfield;
+}
+
+/* Pantalla muy estrecha o texto al 150-200 % (viewport de 180-300 px):
+   botones de 44 px y el valor cede ancho y letra. */
+@media (max-width: 300px) {
+  .stepper > button,
+  .stepper__btn {
+    width: 44px;
+    min-width: 44px;
+  }
+
+  .stepper > output,
+  .stepper > span,
+  .stepper > input,
+  .stepper__value {
+    min-width: 0;
+    padding-inline: var(--space-1);
+    font-size: 1.125rem;
+  }
 }
 
 /* ---------- 13. Utilidades ---------- */
@@ -1673,9 +1812,54 @@ label.row:has(> input:disabled) {
   font-weight: 700;
 }
 
-/* Elemento de lista no disponible (por ejemplo, necesita equipo que no hay). */
-.list__item.is-disabled {
-  opacity: 0.5;
+/* Elemento de lista no disponible (por ejemplo, necesita equipo que no hay).
+   Sin opacidad en el texto (rompía el contraste AA): se apaga la miniatura,
+   el título pasa a gris, los chips pierden el color y el requisito va en
+   coral. Todo el texto queda >= 4,5:1 sobre la tarjeta. */
+.list__item.is-disabled .list__thumb {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+.list__item.is-disabled .list__title {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.list__item.is-disabled .list__meta {
+  color: var(--accent-2);
+}
+
+.list__item.is-disabled .chip {
+  border-style: dashed;
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+/* Texto al 150-200 %: miniatura más pequeña (y fuera a 200 %) para que el
+   título y los chips tengan sitio; los chips pueden partirse en dos líneas. */
+@media (max-width: 300px) {
+  .list__item {
+    gap: var(--space-2);
+    padding-inline: var(--space-3);
+  }
+
+  .list__thumb {
+    width: 40px;
+    height: 40px;
+  }
+
+  .chip {
+    max-width: 100%;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 220px) {
+  .list__thumb {
+    display: none;
+  }
 }
 
 /* ---------- 14b. Panel inferior (.sheet) ----------
@@ -1734,9 +1918,11 @@ label.row:has(> input:disabled) {
 }
 
 .sheet__title {
+  min-width: 0; /* el botón de cerrar (✕) no se sale ni encoge */
   margin: 0;
   font-size: 1.25rem;
   font-weight: 700;
+  overflow-wrap: break-word;
 }
 
 .sheet__body {
@@ -1886,6 +2072,54 @@ body.has-timer .session__figure .anim-fig--grande {
 @media (max-height: 699px) {
   body.has-timer .session__figure {
     display: none;
+  }
+
+  /* Pantallas bajas (360x640, 375x667): lo que hay que ver al levantar la
+     vista (objetivo y pastillas) va justo tras la cabecera y el aviso de
+     montaje, sin quedar bajo las acciones fijas. La figura, reducida a ~80 px,
+     pasa detrás de las series (se ve al desplazar); con cronómetro se oculta.
+     Nada de esto mueve "Serie hecha", anclado al fondo. */
+  .session:has(> .session__actions) {
+    gap: var(--space-2);
+  }
+
+  .session__header {
+    padding-top: 0;
+  }
+
+  .session__header .screen__title {
+    font-size: 1.3125rem;
+  }
+
+  .session__mount {
+    padding-block: var(--space-2);
+    font-size: 0.875rem;
+  }
+
+  .session__mount::before {
+    width: 24px;
+    height: 24px;
+  }
+
+  .session__figure {
+    order: 1;
+  }
+
+  .session__figure .anim-fig--grande {
+    height: 80px;
+  }
+
+  .session__actions {
+    order: 2;
+    padding-top: var(--space-4);
+  }
+
+  .session__actions ~ * {
+    order: 3;
+  }
+
+  .session__sets .session__set {
+    min-height: 48px;
   }
 }
 
@@ -2043,22 +2277,49 @@ body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) {
   grid-template-areas: "ring info actions";
   column-gap: var(--space-2);
   row-gap: 0;
-  height: var(--timer-h-session);
+  /* Alto mínimo FIJO (no la variable, que timer.js ajusta al alto medido): con el texto
+     al 200 % el contenido (48 px) sigue cabiendo y la franja mide 76 px; si algo creciera,
+     la franja crece y el hueco reservado la sigue. */
+  height: auto;
+  min-height: 76px;
   padding-block: var(--space-2);
   border-radius: var(--radius) var(--radius) 0 0;
 }
 
+/* Las cifras no salen del anillo de 48 px aunque el texto esté al 200 %
+   ("1:30" cabe hasta ~17 px; la cuenta de preparación es de una cifra). */
 body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) .timer__time {
-  font-size: 1rem;
+  font-size: min(1rem, 17px);
 }
 
 body:has(.screen.is-active .session__actions) .timer.is-prep:not(.is-expanded) .timer__time {
-  font-size: 1.375rem;
+  font-size: min(1.375rem, 24px);
+}
+
+/* La columna de la etiqueta es lo que cede: si no le queda sitio ("Descanso"
+   sin ancho con el texto al 200 %), la etiqueta se oculta a la vista (sigue
+   para el lector de pantalla). El estado ya lo dicen el color y el anillo. */
+body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) .timer__info {
+  container-type: inline-size;
 }
 
 body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) .timer__label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.75rem;
   letter-spacing: 0.06em;
+}
+
+@container (max-width: 4.5em) {
+  .timer__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
 }
 
 /* En una fila no cabe el "Siguiente: …" (quedaba en "Siguiente:…"); la propia
@@ -2072,8 +2333,10 @@ body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) .timer__a
   gap: var(--space-1);
 }
 
+/* 56 px de alto (manos sudadas): caben en la franja de 76 px
+   (2 de borde + 8 + 56 + 8), así que la franja y "Serie hecha" no se mueven. */
 body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) .timer__btn {
-  min-height: 48px;
+  min-height: var(--tap);
   min-width: 48px;
   padding-inline: var(--space-2);
   font-size: 0.9375rem;
@@ -2092,9 +2355,10 @@ body:has(.screen.is-active .session__actions) .toast {
 
 .session__quick {
   display: flex;
+  flex-wrap: wrap; /* con el texto muy grande el stepper baja a su propia fila */
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-3);
 }
 
 .session__quick-label {
@@ -2105,11 +2369,56 @@ body:has(.screen.is-active .session__actions) .toast {
 }
 
 .session__quick .stepper {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
 }
 
 .session__quick .stepper > output {
   min-width: 64px;
+}
+
+/* Texto al 150-200 % (viewport de 180-300 px): series en una columna para
+   que "24,75 × 15" no se corte, y el valor del stepper rápido cede ancho. */
+@media (max-width: 300px) {
+  .session__sets {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .session__quick .stepper > output {
+    min-width: 0;
+  }
+
+  .session__set-text {
+    font-size: 1.125rem;
+  }
+
+  /* Con el texto al 150-200 % las acciones fijas (stepper + "Serie hecha" +
+     hueco de la franja) ocupaban casi toda la altura y la franja llegaba a
+     tapar el botón: aquí van en el flujo, al final de la sesión. El botón
+     queda en el mismo sitio con y sin cronómetro (el hueco va debajo). */
+  .session__actions {
+    position: relative;
+    bottom: auto;
+  }
+
+  /* La franja compacta no cabe en una fila: botones en una segunda fila. */
+  body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) {
+    grid-template-columns: var(--ring-size) minmax(0, 1fr);
+    grid-template-areas:
+      "ring    info"
+      "actions actions";
+    row-gap: var(--space-2);
+  }
+
+  body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) .timer__actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  body:has(.screen.is-active .session__actions) .timer:not(.is-expanded) .timer__btn {
+    min-width: 0;
+    padding-inline: var(--space-1);
+  }
 }
 
 .session__done {

@@ -70,7 +70,7 @@ function textoEquipo(ej) {
 }
 
 function rango([a, b]) {
-  return a === b ? `${a}` : `${a}-${b}`;
+  return a === b ? `${a}` : `${a}–${b}`;
 }
 
 function textoSeries(item) {
@@ -244,7 +244,7 @@ export function render(contenedor, ctx) {
         <div>
           <p class="screen__subtitle">${esc(etiquetaFecha)}</p>
           <h1 class="screen__title">${esc(dia.nombre)}</h1>
-          <p class="muted">${r.ejercicios} ejercicios · ${r.series} series · ~${r.minutosEstimados} min</p>
+          <p class="muted">${r.ejercicios} ejercicios · ${r.series} series · unos ${r.minutosEstimados} min</p>
         </div>
       </header>
       <div class="stack">
@@ -291,7 +291,9 @@ function empezarNueva(ctx, dia) {
   let sesion;
   try {
     // Fecha de la sesión: HOY (aunque se haya elegido otro día de la semana para verlo).
-    sesion = crearSesion(d.rutina(), dia.id, d.hoy(), d.config());
+    // Con el historial: cada serie nace con lo hecho la última vez (o el mínimo del rango).
+    const sesiones = ctx.storage.get(ctx.storage.CLAVES.sesiones, []);
+    sesion = crearSesion(d.rutina(), dia.id, d.hoy(), d.config(), Date.now(), { sesiones });
   } catch (err) {
     ctx.toast(err && err.message ? err.message : 'No se ha podido crear la sesión');
     return;

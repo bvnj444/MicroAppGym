@@ -234,7 +234,7 @@ function pintarSesion(contenedor, sesion, paso) {
 
 function textoPastilla(tipo, peso, cantidad, tiempo) {
   const medida = tiempo ? `${cantidad ?? '–'} s` : `${cantidad ?? '–'}`;
-  return tipo ? `${kg(peso).replace(' kg', '')} × ${medida}` : medida;
+  return tipo ? `${kg(peso).replace(/\s*kg$/, '')} × ${medida}` : medida;
 }
 
 function cambiarRapido(dir, item) {
@@ -310,7 +310,17 @@ function completarSerie(sesion, datos, { foco = false, conDescanso = true } = {}
   }
   const n = r.sesion.ejercicios[datos.ejercicio].series.length;
   if (r.completa) { finalizar(r.sesion); return; }
-  if (!guardar(r.sesion)) toast('No se ha podido guardar la serie');
+  if (!guardar(r.sesion)) {
+    // Memoria llena (o fallo al guardar): manda lo guardado, así que la serie sigue SIN marcar,
+    // sin descanso ni avance. Se conserva el valor elegido (rapido) para reintentar. El aviso de
+    // memoria llena lo pone app.js (storage.EVENTO_LLENO).
+    toast('No se ha podido guardar la serie');
+    if (vistaActiva()) {
+      render(vista.contenedor, vista.ctx);
+      if (foco) enfocarBoton();
+    }
+    return;
+  }
   rapido = null;
 
   let texto = `Serie ${datos.serie + 1} de ${n} hecha.`;
@@ -451,7 +461,7 @@ function pintarResumen(contenedor, ctx, sesion, celebrar) {
       <section class="card session__summary" aria-label="Resumen de la sesión">
         <div class="row session__stats">
           <div class="stat"><span class="stat__value">${r.seriesHechas}</span><span class="stat__label">${r.seriesHechas === 1 ? 'serie' : 'series'}</span></div>
-          <div class="stat"><span class="stat__value">${esc(kg(r.volumen).replace(' kg', ''))}</span><span class="stat__label">kg de volumen</span></div>
+          <div class="stat"><span class="stat__value">${esc(kg(r.volumen).replace(/\s*kg$/, ''))}</span><span class="stat__label">kg de volumen</span></div>
           <div class="stat"><span class="stat__value">${minutos}</span><span class="stat__label">min</span></div>
         </div>
         ${filas ? `<ul class="session__summary-list">${filas}</ul>` : ''}
@@ -570,8 +580,11 @@ function stepper(campo, etiqueta, valor, extra = '') {
     </div>`;
 }
 
-/** Editar peso y repeticiones/segundos de una serie (tocando su pastilla). */
-function abrirEdicion(ejercicio, serie) {
+/**
+ * Editar peso y repeticiones/segundos de una serie (tocando su pastilla). Con `volver` (desde
+ * "Ejercicios de esta sesión"), al guardar se vuelve a la lista de series de ese ejercicio.
+ */
+function abrirEdicion(ejercicio, serie, { volver = null } = {}) {
   const sesion = leer();
   const item = sesion && sesion.ejercicios[ejercicio];
   const s = item && item.series[serie];
@@ -584,6 +597,10 @@ function abrirEdicion(ejercicio, serie) {
   pesos.forEach((p, k) => { if (p <= s.peso) iPeso = k; });
   const actual = w.pasoActual(sesion);
   const esActual = actual && actual.ejercicio === ejercicio && actual.serie === serie;
+  // Serie hecha de otro ejercicio, antes de la actual: desmarcarla devuelve la sesión a ella
+  // (workout.editarSerie) y, al hacerla, se sigue donde se iba.
+  const k = w.ordenPasos(sesion).findIndex((p) => p.ejercicio === ejercicio && p.serie === serie);
+  const vuelveAElla = s.hecha && actual && k < actual.indice && actual.ejercicio !== ejercicio;
   let medida = tiempo ? (s.segundos ?? 30) : (s.repeticiones ?? 10);
   if (esActual && rapido) medida = rapido.valor;
 
@@ -601,6 +618,8 @@ function abrirEdicion(ejercicio, serie) {
       <footer class="sheet__footer">
         <button type="button" class="btn btn--primary btn--block" data-accion="guardar">Guardar</button>
         ${s.hecha ? '<button type="button" class="btn btn--secondary btn--block" data-accion="desmarcar">Marcar como no hecha</button>' : ''}
+        ${vuelveAElla ? '<p class="muted">Si la marcas como no hecha, la sesión vuelve a esta serie y después sigue donde ibas.</p>' : ''}
+        ${volver ? '<button type="button" class="btn btn--ghost btn--block" data-accion="volver">Volver a las series</button>' : ''}
       </footer>`;
   };
 
@@ -614,6 +633,8 @@ function abrirEdicion(ejercicio, serie) {
       medida = tiempo ? limitar(medida + Number(dir) * 5, 5, 600) : limitar(medida + Number(dir), 1, 100);
       pintar(panel);
       panel.querySelector(`[data-paso="medida"][data-dir="${dir}"]`)?.focus();
+    } else if (accion === 'volver' && volver) {
+      volver(serie);
     } else if (accion === 'guardar' || accion === 'desmarcar') {
       const fresca = leer();
       if (!fresca) { cerrarPanel(); return; }
@@ -627,11 +648,22 @@ function abrirEdicion(ejercicio, serie) {
         if (ult && ult.ejercicio === ejercicio && ult.serie === serie && est.visible && est.modo === 'descanso') detener();
       }
       const nueva = w.editarSerie(fresca, ejercicio, serie, cambios);
+      // La sesión vuelve a otra serie: la plancha en marcha (cronoLibre) ya no cuenta.
+      const libre = estadoCronometro();
+      if (fresca.cronoLibre && !nueva.cronoLibre && libre.visible && libre.modo === 'libre') detener();
       if (!guardar(nueva)) toast('No se ha podido guardar');
       if (esActual || accion === 'desmarcar') rapido = null;
       cerrarPanel();
       render(vista.contenedor, vista.ctx);
-      anunciar(`Serie ${serie + 1} ${accion === 'desmarcar' ? 'marcada como no hecha' : 'actualizada'}`);
+      if (volver && accion === 'guardar') {
+        volver(serie);
+        anunciar(`Serie ${serie + 1} de ${nombre(item.ejercicioId)} actualizada`);
+        return;
+      }
+      const antes = w.pasoActual(fresca);
+      const ahora = w.pasoActual(nueva);
+      const cambio = accion === 'desmarcar' && antes && ahora && antes.indice !== ahora.indice;
+      anunciar(`Serie ${serie + 1} ${accion === 'desmarcar' ? 'marcada como no hecha' : 'actualizada'}${cambio ? `. Ahora: ${textoPaso(ahora)}` : ''}`);
       enfocarBoton();
     }
   });
@@ -643,6 +675,7 @@ function abrirMenu() {
   const paso = sesion && w.pasoActual(sesion);
   if (!paso) return;
   const r = w.resumen(sesion);
+  const revisables = w.ejerciciosParaRevisar(sesion);
   let confirmando = false;
 
   const pintar = (panel) => {
@@ -661,6 +694,7 @@ function abrirMenu() {
         <p class="muted">${esc(nombre(paso.item.ejercicioId))} · ${r.seriesHechas} de ${r.seriesTotales} series hechas</p>
       </div>
       <footer class="sheet__footer">
+        ${revisables.length ? `<button type="button" class="btn btn--secondary btn--block" data-accion="revisar">Ejercicios de esta sesión (${revisables.length})</button>` : ''}
         <button type="button" class="btn btn--secondary btn--block" data-accion="saltar">Saltar ejercicio</button>
         <button type="button" class="btn btn--ghost btn--block" data-accion="tecnica">Ver técnica</button>
         <button type="button" class="btn btn--danger btn--block" data-accion="terminar">Terminar sesión</button>
@@ -674,9 +708,80 @@ function abrirMenu() {
     else if (accion === 'tecnica') {
       cerrarPanel();
       if (vista.ctx.abrirEjercicio) vista.ctx.abrirEjercicio(paso.item.ejercicioId);
-    } else if (accion === 'saltar') saltar();
+    } else if (accion === 'revisar') abrirRevision();
+    else if (accion === 'saltar') saltar();
     else if (accion === 'terminar-si') terminarAhora();
   });
+}
+
+/** "Ejercicios de esta sesión": los ya trabajados (salvo el actual) para corregir sus series. */
+function abrirRevision(enfocar = null) {
+  const sesion = leer();
+  const lista = sesion ? w.ejerciciosParaRevisar(sesion) : [];
+  if (!lista.length) { cerrarPanel(); enfocarBoton(); return; }
+  const panel = abrirPanel((p) => {
+    p.innerHTML = `
+      ${cabecera('Ejercicios de esta sesión')}
+      <div class="sheet__body">
+        <p class="muted">Toca uno para revisar o corregir sus series.</p>
+        <div class="list">${lista.map((e) => `
+          <button type="button" class="list__item" data-revisar="${e.ejercicio}">
+            <span class="list__thumb" aria-hidden="true">${htmlFigura(e.ejercicioId, { tamano: 'mini', animada: false })}</span>
+            <span class="list__text">
+              <span class="list__title">${esc(nombre(e.ejercicioId))}</span>
+              <span class="list__meta">${e.hechas} de ${e.total} ${e.total === 1 ? 'serie hecha' : 'series hechas'}${e.saltado ? ' · saltado' : ''}</span>
+            </span>
+          </button>`).join('')}
+        </div>
+      </div>
+      <footer class="sheet__footer">
+        <button type="button" class="btn btn--secondary btn--block" data-accion="cerrar">Seguir entrenando</button>
+      </footer>`;
+  }, (boton) => {
+    if (boton.dataset.revisar !== undefined) abrirSeriesDe(Number(boton.dataset.revisar));
+  });
+  const foco = enfocar !== null ? panel.querySelector(`[data-revisar="${enfocar}"]`) : null;
+  (foco || panel.querySelector('[data-revisar]'))?.focus();
+}
+
+/** Series (pastillas editables) de un ejercicio de la sesión que no es el actual. */
+function abrirSeriesDe(ejercicio, enfocar = null) {
+  const sesion = leer();
+  const item = sesion && sesion.ejercicios[ejercicio];
+  if (!item) { cerrarPanel(); return; }
+  const tipo = planner.tipoMontaje(item);
+  const tiempo = esTiempo(item);
+  const n = item.series.length;
+  const pastillas = item.series.map((st, i) => {
+    const cantidad = tiempo ? st.segundos : st.repeticiones;
+    const clase = st.hecha ? ' is-done' : '';
+    const etiqueta = `Serie ${i + 1} de ${n}, ${st.hecha ? 'hecha' : 'pendiente'}: ${tipo ? kg(st.peso) + ', ' : ''}${cantidad ?? '–'} ${tiempo ? 'segundos' : 'repeticiones'}. Editar`;
+    return `
+      <li><button type="button" class="session__set${clase}" data-serie="${i}" aria-label="${esc(etiqueta)}">
+        <span class="set-pill${clase}" aria-hidden="true">${i + 1}</span>
+        <span class="session__set-text" aria-hidden="true">${esc(textoPastilla(tipo, st.peso, cantidad, tiempo))}</span>
+      </button></li>`;
+  }).join('');
+  const vol = w.resumen(sesion).porEjercicio[ejercicio].volumen;
+  const panel = abrirPanel((p) => {
+    p.innerHTML = `
+      ${cabecera(nombre(item.ejercicioId))}
+      <div class="sheet__body">
+        <p class="muted">Objetivo: ${esc(w.textoObjetivo(item))}${vol > 0 ? ` · ${esc(kg(vol))} de volumen` : ''}. Toca una serie para corregirla.</p>
+        <ol class="set-pills session__sets" aria-label="Series de ${esc(nombre(item.ejercicioId))}">${pastillas}</ol>
+      </div>
+      <footer class="sheet__footer">
+        <button type="button" class="btn btn--secondary btn--block" data-accion="lista">Volver a los ejercicios</button>
+      </footer>`;
+  }, (boton) => {
+    if (boton.dataset.accion === 'lista') { abrirRevision(ejercicio); return; }
+    if (boton.dataset.serie === undefined) return;
+    abrirEdicion(ejercicio, Number(boton.dataset.serie), {
+      volver: (serie = null) => abrirSeriesDe(ejercicio, serie),
+    });
+  });
+  const foco = enfocar !== null ? panel.querySelector(`[data-serie="${enfocar}"]`) : null;
+  (foco || panel.querySelector('[data-serie]'))?.focus();
 }
 
 function saltar() {

@@ -5,14 +5,17 @@
  * "Empezar de nuevo" en Rutina):
  *   1. marcasNuevas, sugerirProgresion y racha antes/después (progress.js, lógica pura);
  *   2. APLICA las sugerencias con cambios a la rutina guardada (aplicarProgresion);
- *   3. guarda `progresion` en el registro de la sesión y `deshacerProgresion` en meta
+ *   3. guarda `progresion` COMPACTA (storage.compactarProgresion: sin cambios/paso/diaId…, solo
+ *      las 3 marcas que se enseñan) en el registro de la sesión y `deshacerProgresion` en meta
  *      (formas en los CONTRATOS de storage.js);
  *   4. aviso de racha (notificaciones.js) y datos del recordatorio para el service worker.
  * Es idempotente: una sesión que ya tiene `progresion` no se vuelve a evaluar ni a aplicar.
  *
  * API
  *   prepararCierre(storage, sesionTerminada, sesionesGuardadas, ahora?)
- *       -> { sesion (con progresion), rutinaNueva | null, rutinaAnterior | null, nuevo: boolean }
+ *       -> { sesion (con progresion compacta), rutinaNueva | null, rutinaAnterior | null, nuevo: boolean,
+ *            + si nuevo: sugerencias (completas, de progress.js), racha { antes, despues, hito },
+ *              record, hoy }
  *       No escribe nada. sesionesGuardadas = lo que hay en CLAVES.sesiones (puede incluir la misma).
  *   completarCierre(storage, cierre, ahora?) -> void
  *       Tras guardar la sesión: rutina nueva, meta (deshacerProgresion, rachaRecord), aviso y datos
@@ -32,6 +35,7 @@ import * as planner from './planner.js';
 import { nombreEjercicio } from './workout.js';
 import { kg } from './data/equipment.js';
 import { notificarFinSesion, actualizarDatos } from './notificaciones.js';
+import { compactarProgresion, marcasRelevantes } from './storage.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -54,9 +58,11 @@ const terminadas = (lista) => (Array.isArray(lista) ? lista : []).filter((s) => 
 
 export function prepararCierre(st, sesion, guardadas, ahora = Date.now()) {
   const previa = (Array.isArray(guardadas) ? guardadas : []).find((s) => s && s.id === sesion.id);
-  if (sesion.progresion) return { sesion, rutinaNueva: null, rutinaAnterior: null, nuevo: false };
+  if (sesion.progresion) {
+    return { sesion: { ...sesion, progresion: compactarProgresion(sesion.progresion) }, rutinaNueva: null, rutinaAnterior: null, nuevo: false };
+  }
   if (previa && previa.progresion) {
-    return { sesion: { ...sesion, progresion: previa.progresion }, rutinaNueva: null, rutinaAnterior: null, nuevo: false };
+    return { sesion: { ...sesion, progresion: compactarProgresion(previa.progresion) }, rutinaNueva: null, rutinaAnterior: null, nuevo: false };
   }
 
   const otras = terminadas(guardadas).filter((s) => s.id !== sesion.id);
@@ -94,15 +100,18 @@ export function prepararCierre(st, sesion, guardadas, ahora = Date.now()) {
     }
   }
 
-  const progresion = {
-    version: 1,
+  const racha = { antes, despues, hito: progress.hitoAlcanzado(antes, despues) };
+  // Se guarda solo lo que se pinta después (resumen e Historial): ver CONTRATOS de storage.js.
+  const progresion = compactarProgresion({
     sugerencias,
-    marcas,
-    racha: { antes, despues, hito: progress.hitoAlcanzado(antes, despues) },
+    marcas: marcasRelevantes(marcas),
+    racha,
     aplicada: Boolean(rutinaNueva),
-    deshecha: false,
+  });
+  return {
+    sesion: { ...sesion, progresion }, rutinaNueva, rutinaAnterior: rutinaNueva ? rutina : null, nuevo: true,
+    sugerencias, racha, record, hoy,
   };
-  return { sesion: { ...sesion, progresion }, rutinaNueva, rutinaAnterior: rutinaNueva ? rutina : null, nuevo: true, record, hoy };
 }
 
 export function completarCierre(st, cierre, ahora = Date.now()) {
@@ -149,32 +158,15 @@ export function deshacerProgresion(st, sesionId) {
   const lista = st.get(st.CLAVES.sesiones, []);
   if (Array.isArray(lista)) {
     st.set(st.CLAVES.sesiones, lista.map((s) => (s && s.id === sesionId && s.progresion
-      ? { ...s, progresion: { ...s.progresion, deshecha: true } } : s)));
+      ? { ...s, progresion: compactarProgresion({ ...s.progresion, deshecha: true }) } : s)));
   }
   return true;
 }
 
 /* ---------- Presentación ---------- */
 
-const PRIORIDAD = { peso: 0, repeticiones: 1, segundos: 2, volumen: 3 };
-
-export function marcasRelevantes(marcas, max = 3) {
-  const lista = (Array.isArray(marcas) ? marcas : []).filter((m) => m && m.ejercicioId)
-    .map((m) => ({ m, mejora: m.anterior ? (m.valor - m.anterior) / m.anterior : 1 }))
-    .sort((a, b) => (PRIORIDAD[a.m.tipo] ?? 9) - (PRIORIDAD[b.m.tipo] ?? 9) || b.mejora - a.mejora)
-    .map((x) => x.m);
-  const elegidas = [];
-  const vistos = new Set();
-  for (const m of lista) {
-    if (elegidas.length >= max) break;
-    if (!vistos.has(m.ejercicioId)) { elegidas.push(m); vistos.add(m.ejercicioId); }
-  }
-  for (const m of lista) {
-    if (elegidas.length >= max) break;
-    if (!elegidas.includes(m)) elegidas.push(m);
-  }
-  return elegidas;
-}
+// La elección vive en storage.js: es también lo que se guarda en progresion.marcas.
+export { marcasRelevantes };
 
 export function textoMarca(m) {
   const v = m.tipo === 'peso' ? kg(m.valor)
@@ -218,7 +210,7 @@ export function htmlProgresion(p, { deshacer = false, racha = true } = {}) {
     const n = Number(p.racha.despues);
     partes.push(`<p class="streak prog__streak">Racha de <strong>${n}</strong></p>`);
     if (p.racha.hito) {
-      partes.push(`<p class="prog__hito" role="status">🏆 ¡Hito alcanzado: ${p.racha.hito} entrenamientos seguidos!</p>`);
+      partes.push(`<p class="prog__hito" role="status">🏆 ¡Hito alcanzado: ${Number(p.racha.hito) || 0} entrenamientos seguidos!</p>`);
     }
   }
 

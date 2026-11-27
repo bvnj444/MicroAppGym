@@ -36,6 +36,11 @@
  * service worker (Cache Storage 'mag-datos'); al arrancar se ajusta el registro de Periodic
  * Background Sync y, como respaldo, se enseña el aviso del día. Al tocar una notificación,
  * sw.js enfoca la app y le manda { tipo: 'mag-navegar', ruta: 'hoy' }.
+ *
+ * Memoria llena: si storage.set() falla por cuota, storage.js lanza storage.EVENTO_LLENO y aquí se
+ * avisa de forma visible: un aviso breve (que sustituye al "No se ha podido guardar…" de la vista)
+ * y una tarjeta fija arriba con "Exportar datos" (views/config.descargarCopia), que se quita
+ * sola cuando vuelve a guardarse todo o al cerrarla.
  */
 
 import * as storage from './storage.js';
@@ -47,6 +52,7 @@ import * as rutina from './views/rutina.js';
 import * as ejercicios from './views/ejercicios.js';
 import * as historial from './views/historial.js';
 import * as config from './views/config.js';
+import { descargarCopia } from './views/config.js';
 // Se importa al arrancar también para que registre su oyente del cronómetro
 // (la plancha se apunta aunque se esté en otra pantalla).
 import * as sesion from './views/sesion.js';
@@ -201,6 +207,7 @@ function mostrar(ruta) {
     else item.removeAttribute('aria-current');
   }
 
+  pintarAvisoLleno(); // se quita si ya se ha vuelto a guardar todo
   if (!destino) return;
   try {
     VISTAS[ruta].render(destino, ctx);
@@ -236,6 +243,51 @@ function mostrarToast(mensaje, ms = 2800) {
   toast.hidden = false;
   clearTimeout(temporizadorToast);
   temporizadorToast = setTimeout(() => { toast.hidden = true; }, ms);
+}
+
+/* ---------- Memoria llena ---------- */
+
+const TEXTO_LLENO_TOAST = 'Memoria llena: no se ha podido guardar. Exporta tus datos (aviso de arriba o Ajustes).';
+let avisoLlenoCerrado = false;
+
+function avisarMemoriaLlena() {
+  // Tras el aviso de la vista ("No se ha podido guardar…"), que se lanza justo después.
+  setTimeout(() => mostrarToast(TEXTO_LLENO_TOAST, 9000), 0);
+  avisoLlenoCerrado = false;
+  pintarAvisoLleno();
+}
+
+/** Tarjeta fija arriba de la pantalla mientras storage.almacenamientoLleno(). */
+function pintarAvisoLleno() {
+  const main = document.querySelector('.app__main');
+  if (!main) return;
+  let aviso = main.querySelector(':scope > [data-aviso-lleno]');
+  if (!storage.almacenamientoLleno() || avisoLlenoCerrado) {
+    aviso?.remove();
+    return;
+  }
+  if (aviso) return;
+  aviso = document.createElement('section');
+  aviso.className = 'card stack';
+  aviso.dataset.avisoLleno = '';
+  aviso.setAttribute('role', 'alert');
+  aviso.setAttribute('aria-labelledby', 'aviso-lleno-titulo');
+  aviso.style.marginBottom = 'var(--space-4)';
+  aviso.style.borderColor = 'var(--accent-2)';
+  aviso.innerHTML = `
+    <h2 class="card__title" id="aviso-lleno-titulo">Memoria llena</h2>
+    <p>El navegador no deja guardar más datos y lo último no se ha guardado. Exporta tus datos
+      ahora para no perderlos.</p>
+    <button type="button" class="btn btn--primary btn--block" data-accion="exportar-lleno">Exportar datos</button>
+    <button type="button" class="btn btn--ghost btn--block" data-accion="cerrar-lleno">Cerrar aviso</button>`;
+  aviso.querySelector('[data-accion="exportar-lleno"]').addEventListener('click', () => {
+    mostrarToast(descargarCopia(storage) ? 'Copia exportada. Guárdala en un sitio seguro.' : 'No se ha podido exportar.', 4000);
+  });
+  aviso.querySelector('[data-accion="cerrar-lleno"]').addEventListener('click', () => {
+    avisoLlenoCerrado = true;
+    pintarAvisoLleno();
+  });
+  main.prepend(aviso); // sin desplazar: en plena sesión no se pierde la serie actual (el toast avisa)
 }
 
 /* ---------- Service worker ---------- */
@@ -281,6 +333,7 @@ function registrarApertura() {
 }
 
 async function arrancar() {
+  window.addEventListener(storage.EVENTO_LLENO, avisarMemoriaLlena);
   try {
     const estado = await storage.init();
     if (!estado.disponible) {

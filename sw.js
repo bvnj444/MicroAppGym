@@ -13,7 +13,7 @@
  *  - 'activate' solo borra las cachés 'gym-*': 'mag-datos' se conserva entre versiones.
  */
 
-const CACHE = 'gym-v9';
+const CACHE = 'gym-v10';
 const CACHE_DATOS = 'mag-datos';
 const RUTA_DATOS = './mag-datos/racha.json';
 const TAG_RACHA = 'mag-racha';

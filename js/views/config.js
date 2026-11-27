@@ -9,6 +9,8 @@
  * "Aviso del descanso" y "Avisos de racha" se guardan al momento (evento 'mag:config').
  * Avisos de racha (js/notificaciones.js): al activarlos se pide el permiso; si se deniega el
  * interruptor queda apagado y se explica cómo permitirlo en Chrome.
+ * Exporta descargarCopia(storage) -> boolean (también la usa el aviso de memoria llena de app.js).
+ * Si storage.almacenamientoLleno(), la tarjeta "Copia de seguridad" lo avisa.
  */
 
 import * as planner from '../planner.js';
@@ -187,6 +189,9 @@ function pintar(contenedor, ctx) {
       <section class="card stack" aria-label="Copia de seguridad">
         <h2 class="card__title">Copia de seguridad</h2>
         <p class="card__meta">Guarda tus datos en un archivo JSON o recupéralos desde uno.</p>
+        ${ctx.storage.almacenamientoLleno && ctx.storage.almacenamientoLleno()
+          ? '<p role="alert"><strong style="color: var(--accent-2)">Memoria llena.</strong> El navegador no deja guardar más y algo no se ha guardado. Exporta tus datos ahora para no perderlos.</p>'
+          : ''}
         <button type="button" class="btn btn--secondary btn--block" data-accion="exportar">Exportar datos</button>
         <button type="button" class="btn btn--secondary btn--block" data-accion="importar">Importar datos</button>
         <input type="file" class="visually-hidden" accept="application/json,.json" data-accion="archivo" tabindex="-1" aria-hidden="true">
@@ -411,21 +416,7 @@ function conectar(contenedor, ctx) {
   });
 
   contenedor.querySelector('[data-accion="exportar"]').addEventListener('click', () => {
-    try {
-      const blob = new Blob([storage.exportar()], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const enlace = document.createElement('a');
-      enlace.href = url;
-      enlace.download = `microapp-gym-${fechaLocal(new Date())}.json`;
-      document.body.append(enlace);
-      enlace.click();
-      enlace.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      ctx.toast('Copia exportada.');
-    } catch (e) {
-      console.error('[config] Error al exportar', e);
-      ctx.toast('No se ha podido exportar.');
-    }
+    ctx.toast(descargarCopia(storage) ? 'Copia exportada.' : 'No se ha podido exportar.');
   });
 
   const archivo = contenedor.querySelector('[data-accion="archivo"]');
@@ -434,13 +425,22 @@ function conectar(contenedor, ctx) {
     const fichero = archivo.files && archivo.files[0];
     if (!fichero) return;
     try {
-      const resultado = storage.importar(await fichero.text());
+      const texto = await fichero.text();
+      // Primero se comprueba la copia sin tocar nada y se enseña lo que trae.
+      const analisis = storage.analizarCopia(texto);
+      if (!analisis.ok) {
+        ctx.toast(analisis.error, 4500);
+        return;
+      }
+      if (!(await confirmarImportacion(contenedor, analisis.resumen, storage))) return;
+      const resultado = storage.importar(texto);
       if (resultado.ok) {
         borrador = storage.getConfig();
         pintar(contenedor, ctx);
         // Rehace los datos del recordatorio (mag-datos) y el registro periódico con lo importado.
         window.dispatchEvent(new CustomEvent('mag:config'));
-        ctx.toast('Datos importados.');
+        const n = resultado.resumen.descartadas;
+        ctx.toast(n ? `Datos importados. Se ${n === 1 ? 'ha descartado 1 sesión no válida' : `han descartado ${n} sesiones no válidas`}.` : 'Datos importados.', n ? 4500 : undefined);
       } else {
         ctx.toast(resultado.error, 4500);
       }
@@ -450,6 +450,99 @@ function conectar(contenedor, ctx) {
     } finally {
       archivo.value = '';
     }
+  });
+}
+
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+
+/**
+ * Panel propio (<dialog class="sheet">) que enseña lo que trae la copia y avisa de que
+ * reemplazará lo actual. -> Promise<boolean> (true = importar).
+ */
+function confirmarImportacion(contenedor, resumen, storage) {
+  const trae = [];
+  const reemplaza = [];
+  const conserva = [];
+  if (resumen.sesiones !== null) {
+    trae.push(plural(resumen.sesiones, 'sesión en el historial', 'sesiones en el historial')
+      + (resumen.descartadas ? ` (se ${resumen.descartadas === 1 ? 'descarta 1 no válida' : `descartan ${resumen.descartadas} no válidas`})` : ''));
+    const actuales = storage.get(storage.CLAVES.sesiones, []);
+    reemplaza.push(`tu historial (${plural(Array.isArray(actuales) ? actuales.length : 0, 'sesión', 'sesiones')})`);
+  } else conserva.push('tu historial');
+  if (resumen.diasRutina !== null) {
+    trae.push(resumen.diasRutina ? `Rutina de ${plural(resumen.diasRutina, 'día', 'días')}` : 'Sin rutina');
+    reemplaza.push('tu rutina');
+  } else conserva.push('tu rutina');
+  if (resumen.config) {
+    trae.push('Configuración y ajustes');
+    reemplaza.push('tus ajustes');
+  } else conserva.push('tus ajustes');
+  if (resumen.sesionActiva) trae.push('Una sesión a medias');
+  if (resumen.exportadoEn) {
+    const fecha = new Date(resumen.exportadoEn).toLocaleString('es-ES', {
+      day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+    trae.push(`Exportada el ${fecha}`);
+  }
+  const lista = (items) => items.join(', ').replace(/, ([^,]*)$/, ' y $1');
+
+  const panel = document.createElement('dialog');
+  panel.className = 'sheet';
+  panel.setAttribute('aria-labelledby', 'cfg-importar-titulo');
+  panel.innerHTML = `
+    <div class="sheet__handle" aria-hidden="true"></div>
+    <header class="sheet__header">
+      <h2 class="sheet__title" id="cfg-importar-titulo">¿Importar esta copia?</h2>
+    </header>
+    <div class="sheet__body">
+      <div class="stack">
+        <p>La copia trae:</p>
+        <ul data-trae style="padding-left: 1.25rem; list-style: disc"></ul>
+      </div>
+      <p data-reemplaza></p>
+      <p class="muted" data-conserva></p>
+    </div>
+    <footer class="sheet__footer">
+      <button type="button" class="btn btn--danger btn--block" data-respuesta="si">Importar y reemplazar</button>
+      <button type="button" class="btn btn--ghost btn--block" data-respuesta="no">Cancelar</button>
+    </footer>`;
+  const ul = panel.querySelector('[data-trae]');
+  for (const t of trae) {
+    const li = document.createElement('li');
+    li.textContent = t;
+    ul.append(li);
+  }
+  const pReemplaza = panel.querySelector('[data-reemplaza]');
+  const fuerte = document.createElement('strong');
+  fuerte.textContent = 'Reemplazará lo que tienes ahora: ';
+  pReemplaza.append(fuerte, `${lista(reemplaza) || 'solo datos internos'}. No se puede deshacer; si dudas, exporta antes tus datos.`);
+  const pConserva = panel.querySelector('[data-conserva]');
+  const varios = conserva.length > 1 || conserva[0] === 'tus ajustes';
+  if (conserva.length) pConserva.textContent = `Se conserva${varios ? 'n' : ''} ${lista(conserva)}: la copia no ${varios ? 'los' : 'lo'} trae.`;
+  else pConserva.remove();
+
+  return new Promise((resolver) => {
+    let hecho = false;
+    const cerrar = (respuesta) => {
+      if (hecho) return;
+      hecho = true;
+      if (panel.open) panel.close();
+      panel.remove();
+      resolver(respuesta);
+    };
+    panel.addEventListener('click', (e) => {
+      if (e.target === panel) { cerrar(false); return; }
+      const boton = e.target.closest('[data-respuesta]');
+      if (boton) cerrar(boton.dataset.respuesta === 'si');
+    });
+    // Botón atrás de Android / Escape.
+    panel.addEventListener('cancel', (e) => { e.preventDefault(); cerrar(false); });
+    // Si app.js lo cierra al cambiar de pantalla, cuenta como cancelar.
+    panel.addEventListener('close', () => cerrar(false));
+    contenedor.append(panel);
+    if (typeof panel.showModal === 'function') panel.showModal();
+    else panel.setAttribute('open', '');
+    panel.querySelector('[data-respuesta="no"]').focus();
   });
 }
 
@@ -478,6 +571,25 @@ function guardarNotificaciones(ctx, notificaciones) {
 function fechaLocal(fecha) {
   const p = (n) => String(n).padStart(2, '0');
   return `${fecha.getFullYear()}-${p(fecha.getMonth() + 1)}-${p(fecha.getDate())}`;
+}
+
+/** Descarga todos los datos en un archivo JSON. No escribe en localStorage (funciona aunque esté lleno). */
+export function descargarCopia(storage) {
+  try {
+    const blob = new Blob([storage.exportar()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = `microapp-gym-${fechaLocal(new Date())}.json`;
+    document.body.append(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  } catch (e) {
+    console.error('[config] Error al exportar', e);
+    return false;
+  }
 }
 
 export function render(contenedor, ctx) {

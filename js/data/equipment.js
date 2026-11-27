@@ -173,13 +173,13 @@ function numeroKg(gramos) {
 }
 
 export function kg(gramos) {
-  return numeroKg(gramos) + ' kg';
+  return numeroKg(gramos) + '\u00A0kg'; // espacio no separable: "5,75 kg" nunca se parte
 }
 
 const listaDiscos = (discos) => discos.map(numeroKg).join(' + ');
 
 export function textoMontaje(resultado, tipo) {
-  const total = numeroKg(resultado.total) + ' kg';
+  const total = numeroKg(resultado.total) + '\u00A0kg';
   const cabecera =
     tipo === 'barra' ? `Barra: ${total}`
     : tipo === 'par-mancuernas' ? `2 mancuernas: ${total} cada una`

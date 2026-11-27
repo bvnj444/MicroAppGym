@@ -1,6 +1,6 @@
 # MicroApp Gym — Plan de implementación
 
-> Estado: **Fases 1 a 7 terminadas y revisadas por qa-movil (la Fase 7, pendiente de probar en el Android las notificaciones de racha). Publicada en https://bvnj444.github.io/MicroAppGym/. Siguiente: Fase 8 (pruebas y pulido).**
+> Estado: **Fases 1 a 8 terminadas y revisadas por qa-movil. Falta el criterio final de la Fase 8: una semana real de entrenamiento en el Android. Publicada en https://bvnj444.github.io/MicroAppGym/. Siguiente: Fase 9 (app Android con Capacitor).**
 > Última actualización: 23/11/2026 (revisión 2: correcciones de los subagentes experto-ejercicios, logica-entrenamiento y qa-movil)
 
 ---
@@ -482,7 +482,7 @@ Cada fase termina con una revisión de **qa-movil**. Una fase solo está termina
 - Uso sin conexión.
 - Tamaños de pantalla de 360 a 430 px.
 - Accesibilidad y pulido final.
-- Pendientes anotados por qa-movil:
+- Pendientes anotados por qa-movil (hechos el 27/11/2026):
   - Editar series de ejercicios anteriores de la sesión.
   - `--timer-h` igual a la altura real de la franja.
   - Recortar `progresion` en las sesiones antiguas para no llenar localStorage en unos años.
@@ -518,5 +518,7 @@ Motivo: una web app, aunque esté instalada desde Chrome, no puede vibrar con la
 - [x] **Publicación en GitHub Pages:** confirmada. El código está en `github.com/bvnj444/MicroAppGym`, con el correo privado de GitHub en los commits.
 - [ ] **Activar GitHub Pages** en los ajustes del repositorio (lo hace el usuario): *Settings → Pages → Deploy from a branch → `main` / `(root)`*.
 - [x] **Notificaciones de racha:** sí, sin servidor (al terminar la sesión y recordatorio aproximado con Periodic Background Sync). La hora exacta llega con la Fase 9 (app nativa).
+- [x] **Repeticiones propuestas en la sesión:** lo hecho la última vez en esa serie (con el mismo peso o menos), o el mínimo del rango; nunca el máximo, para que la progresión solo suba el peso cuando se llega de verdad (27/11/2026).
+- [x] **Importar datos:** valida la copia, pide confirmación y conserva lo que la copia no trae (27/11/2026).
 - [x] **App nativa (Fase 9):** tras terminar la web (Fases 6–8) se empaqueta con Capacitor para que el aviso del descanso vibre con el móvil bloqueado y los recordatorios lleguen a su hora (24/11/2026).
 - [x] **Aviso del descanso configurable:** ambos, solo sonido o solo vibración, y "Pitar aunque el móvil esté bloqueado" (audio de fondo). Confirmado en el Android (24/11/2026).

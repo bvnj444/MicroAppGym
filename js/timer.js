@@ -857,12 +857,41 @@ function asegurarUI() {
   seccion.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && estaAmpliado()) ampliar(false);
   });
+  vigilarAlto(seccion);
   // Atrás de Android con el cronómetro ampliado: se reduce. La entrada de historial propia
   // no cambia la URL (ni el hash), así que app.js no cambia de pestaña.
   window.addEventListener('popstate', () => {
     if (estaAmpliado() && !esEntradaPropia()) ampliar(false, { desdeHistorial: true });
   });
   return ui;
+}
+
+/**
+ * Hueco reservado = alto real de la franja. styles.css trae valores por defecto (--timer-h para la
+ * franja normal, --timer-h-session para la compacta de la sesión, que además tiene un alto mínimo
+ * fijo para que "✓ Serie hecha" no se mueva); aquí se fija en <html> el alto medido cuando la
+ * franja se ve sin ampliar (p. ej. con el texto al 200 % puede crecer). Si no hay ResizeObserver,
+ * se quedan los valores del CSS.
+ */
+function vigilarAlto(seccion) {
+  if (typeof ResizeObserver !== 'function') return;
+  const raiz = document.documentElement;
+  const medidos = { '--timer-h': '', '--timer-h-session': '' };
+  const medir = (entrada) => {
+    if (seccion.hidden || estaAmpliado()) return;
+    const caja = entrada && entrada.borderBoxSize && entrada.borderBoxSize[0];
+    const alto = Math.ceil(caja ? caja.blockSize : seccion.offsetHeight);
+    if (!alto) return;
+    const compacta = !!document.querySelector('.screen.is-active .session__actions');
+    const nombre = compacta ? '--timer-h-session' : '--timer-h';
+    const valor = `${alto}px`;
+    if (medidos[nombre] === valor) return;
+    medidos[nombre] = valor;
+    raiz.style.setProperty(nombre, valor);
+  };
+  try {
+    new ResizeObserver((entradas) => medir(entradas[entradas.length - 1])).observe(seccion);
+  } catch (e) { /* sin observador: valores del CSS */ }
 }
 
 const MARCA_HISTORIAL = 'cronometroAmpliado';

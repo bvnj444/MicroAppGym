@@ -47,7 +47,7 @@ export const MUSCULOS = [
 
 /* Escalones reutilizados (solo datos) */
 const BAJADA_3S = { tipo: 'tempo', valor: '3-0-1', texto: 'Baja en 3 segundos' };
-const RANGO_15_20 = { tipo: 'rango', repeticiones: [15, 20], texto: 'Sube el rango a 15-20 repeticiones' };
+const RANGO_15_20 = { tipo: 'rango', repeticiones: [15, 20], texto: 'Sube el rango a 15–20 repeticiones' };
 
 export const EJERCICIOS = [
   /* ============================== PECHO ============================== */
@@ -589,7 +589,7 @@ export const EJERCICIOS = [
     porDefecto: { series: 4, repeticiones: [12, 20], segundos: null, descanso: 60 },
     variantes: [
       BAJADA_3S,
-      { tipo: 'rango', repeticiones: [20, 25], texto: 'Sube el rango a 20-25 repeticiones' },
+      { tipo: 'rango', repeticiones: [20, 25], texto: 'Sube el rango a 20–25 repeticiones' },
     ],
     sustitutos: ['press-militar-mancuernas'],
     requiere: [],
@@ -622,7 +622,7 @@ export const EJERCICIOS = [
     porDefecto: { series: 3, repeticiones: [15, 20], segundos: null, descanso: 60 },
     variantes: [
       BAJADA_3S,
-      { tipo: 'rango', repeticiones: [20, 25], texto: 'Sube el rango a 20-25 repeticiones' },
+      { tipo: 'rango', repeticiones: [20, 25], texto: 'Sube el rango a 20–25 repeticiones' },
     ],
     sustitutos: [],
     requiere: [],
@@ -1202,7 +1202,7 @@ export const EJERCICIOS = [
     animacion: 'plancha',
     porDefecto: { series: 3, repeticiones: null, segundos: [30, 45], descanso: 60 },
     variantes: [
-      { tipo: 'tiempo', segundos: [45, 60], texto: 'Sube a 45-60 segundos' },
+      { tipo: 'tiempo', segundos: [45, 60], texto: 'Sube a 45–60 segundos' },
       { tipo: 'lastre', texto: 'Con un disco sobre la espalda (que te lo coloque otra persona)' },
     ],
     sustitutos: ['elevacion-piernas', 'crunch'],

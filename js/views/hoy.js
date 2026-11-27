@@ -11,6 +11,9 @@
 import * as planner from '../planner.js';
 import { calcularRacha } from '../progress.js';
 
+/** Escapa texto que viene de datos guardados (o importados) antes de meterlo en innerHTML. */
+const esc = (texto) => String(texto ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 const LETRAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const NOMBRES_DIA = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 const MONTAJE = {
@@ -62,7 +65,7 @@ function tarjetaEntreno(dia, hecha = false) {
   return `
       <article class="card card--highlight">
         <p class="card__meta">${hecha ? 'Entrenamiento de hoy · completado' : 'Entrenamiento de hoy'}</p>
-        <h2 class="card__title">${dia.nombre}</h2>
+        <h2 class="card__title">${esc(dia.nombre)}</h2>
         <div class="card__body stack">
           <p class="muted">${r.ejercicios} ejercicios · ${r.series} series · unos ${r.minutosEstimados} min</p>
           <p class="row">${chipsMontaje(r.montajes)}</p>
@@ -76,7 +79,7 @@ function tarjetaDescanso(proximo, hoyTexto) {
   let texto = 'No hay entrenamientos en los próximos días.';
   if (proximo) {
     const cuando = proximo.fecha === sumarUnDia(hoyTexto) ? 'mañana, ' : 'el ';
-    texto = `Próximo entrenamiento: <strong>${proximo.dia.nombre}</strong>, ${cuando}${formatoFecha.format(aFecha(proximo.fecha))}.`;
+    texto = `Próximo entrenamiento: <strong>${esc(proximo.dia.nombre)}</strong>, ${cuando}${formatoFecha.format(aFecha(proximo.fecha))}.`;
   }
   return `
       <article class="card">
@@ -111,7 +114,7 @@ function tarjetaRacha(racha, diaHoy) {
     ? 'Empieza tu racha hoy'
     : `<strong>${n}</strong> ${n === 1 ? 'entrenamiento seguido' : 'entrenamientos seguidos'} sin fallar`;
   const pendiente = racha.hoyPendiente && diaHoy
-    ? `<p class="hoy-racha__pending">Hoy toca ${diaHoy.nombre}: ${n > 0 ? '¡no la pierdas!' : '¡a por ella!'}</p>`
+    ? `<p class="hoy-racha__pending">Hoy toca ${esc(diaHoy.nombre)}: ${n > 0 ? '¡no la pierdas!' : '¡a por ella!'}</p>`
     : '';
   return `
       <section class="card hoy-racha" aria-labelledby="hoy-racha-titulo">
@@ -128,12 +131,12 @@ function pintarSemana(dias, hoyTexto, fechasHechas) {
     let estado;
     if (fechasHechas.has(d.fecha)) {
       clases.push('is-done');
-      estado = d.dia ? `${d.dia.nombre}, hecho` : 'entrenado';
+      estado = d.dia ? `${esc(d.dia.nombre)}, hecho` : 'entrenado';
     } else if (d.descanso) {
       clases.push('is-rest');
       estado = 'descanso';
     } else {
-      estado = `${d.dia.nombre}, ${d.fecha < hoyTexto ? 'sin hacer' : 'pendiente'}`;
+      estado = `${esc(d.dia.nombre)}, ${d.fecha < hoyTexto ? 'sin hacer' : 'pendiente'}`;
     }
     const esHoy = d.fecha === hoyTexto;
     if (esHoy) clases.push('is-today');

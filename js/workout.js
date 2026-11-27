@@ -20,9 +20,19 @@
  *     series: [{ peso, repeticiones, segundos, hecha, + hechaEn: ISO | null }]
  *   }]
  * }
- *   Las series nacen con los valores PLANEADOS (peso sugerido, máximo del rango de repeticiones
- *   o de segundos; 10 repeticiones si es "casi al fallo") y hecha: false. Al marcarlas se
- *   guardan los valores reales.
+ *   Las series nacen con los valores PLANEADOS y hecha: false; al marcarlas se guardan los reales.
+ *   Peso: el sugerido. Repeticiones (o segundos), REGLA DEL RELLENO INICIAL (Fase 8):
+ *     - Referencia: la ÚLTIMA vez que se hizo el ejercicio (sesión terminada más reciente por
+ *       fecha + inicio con alguna serie hecha de ese ejercicioId; si sale dos veces en esa sesión,
+ *       la primera aparición con series hechas). Serie k <- la serie k de entonces si se hizo; si
+ *       no, la última serie hecha de entonces.
+ *     - Se usa su valor solo si: misma variante, mismo tipo (repeticiones/tiempo), el peso de
+ *       AHORA es igual o menor que el de entonces (con más peso lo de entonces ya no vale) y el
+ *       valor cae dentro del rango [mín, máx] actual.
+ *     - Si no, o si no hay historial: el MÍNIMO del rango (repeticiones o segundos).
+ *     - "Casi al fallo" (sin rango): 10 repeticiones, como siempre.
+ *   Así, pulsar "✓ Serie hecha" sin tocar nada nunca registra más de lo que ya se hizo y la doble
+ *   progresión no sube el peso por un relleno optimista.
  *
  * ORDEN DE LOS PASOS
  *   Ejercicios en el orden de la rutina (ya agrupados por montaje). Superserie = dos ejercicios
@@ -35,7 +45,9 @@
  *   Series de tiempo y de peso corporal (peso 0) no suman.
  *
  * API
- *   crearSesion(rutina, diaId, fecha, config, ahora?)  -> sesión nueva (nivel aplicado para `fecha`)
+ *   crearSesion(rutina, diaId, fecha, config, ahora?, { sesiones }?)
+ *       -> sesión nueva (nivel aplicado para `fecha`); `sesiones` = historial (CLAVES.sesiones)
+ *          para el relleno inicial de repeticiones/segundos (sin él, el mínimo del rango)
  *   ordenPasos(sesion)                     -> [{ ejercicio, serie, ronda, unidad, pareja }]
  *   pasoActual(sesion)                     -> paso | null (null = no queda nada)
  *       paso = { ejercicio, serie, indice, total, item, set, numeroEjercicio, totalEjercicios,
@@ -48,6 +60,9 @@
  *       cambios = { peso?, repeticiones?, segundos?, hecha? }; con propagar, un cambio de peso
  *       se copia a las series PENDIENTES posteriores del mismo ejercicio. Con hecha: false, si la
  *       serie está antes de la actual, la posición vuelve a ella (y el ejercicio deja de estar saltado).
+ *       (también quita cronoLibre si era de otra serie).
+ *   ejerciciosParaRevisar(sesion)          -> [{ ejercicio, ejercicioId, hechas, total, saltado }]: los
+ *                                             que tienen series hechas, salvo el actual (menú de la sesión)
  *   saltarEjercicio(sesion, ejercicio?)    -> sesión con ese ejercicio saltado (por defecto, el actual)
  *   saltar(sesion, ejercicio?)             -> { sesion, descanso, siguiente }: igual, y si se salta B
  *                                             justo tras hacer A de la misma ronda, descanso de la pareja
@@ -105,17 +120,47 @@ function diaConNivel(rutina, diaId, fecha, config) {
   return planner.diaParaFecha(sola, config, fecha).dia || clonar(base);
 }
 
-export function crearSesion(rutina, diaId, fecha, config, ahora = Date.now()) {
+/** Series de la última vez que se hizo `ejercicioId` (ver REGLA DEL RELLENO INICIAL) o null. */
+function ultimaVez(sesiones, ejercicioId) {
+  if (!Array.isArray(sesiones)) return null;
+  let mejor = null;
+  let clave = '';
+  for (const s of sesiones) {
+    if (!esObjeto(s) || s.terminada !== true || !Array.isArray(s.ejercicios)) continue;
+    const item = s.ejercicios.find((e) => esObjeto(e) && e.ejercicioId === ejercicioId
+      && Array.isArray(e.series) && e.series.some((st) => esObjeto(st) && st.hecha));
+    if (!item) continue;
+    const k = `${s.fecha || ''}|${s.inicio || ''}`;
+    if (!mejor || k >= clave) { mejor = item; clave = k; }
+  }
+  return mejor;
+}
+
+/** Repeticiones/segundos iniciales de la serie k (REGLA DEL RELLENO INICIAL). */
+function valorInicial(e, k, peso, campo, r, previo) {
+  if (!r) return null;
+  if (!previo || (previo.variante ?? null) !== (e.variante ?? null)) return r[0];
+  const hechas = previo.series.filter((st) => esObjeto(st) && st.hecha);
+  const ref = esObjeto(previo.series[k]) && previo.series[k].hecha ? previo.series[k] : hechas[hechas.length - 1];
+  const v = ref ? ref[campo] : null;
+  const ok = typeof v === 'number' && Number.isFinite(v) && v >= r[0] && v <= r[1]
+    && peso <= (Number(ref.peso) || 0);
+  return ok ? v : r[0];
+}
+
+export function crearSesion(rutina, diaId, fecha, config, ahora = Date.now(), { sesiones = null } = {}) {
   const dia = diaConNivel(rutina, diaId, fecha, config);
   const t = aMs(ahora);
   const ejercicios = dia.ejercicios.map((e) => {
     const reps = rango(e.repeticiones);
     const segs = rango(e.segundos);
     const conPeso = Boolean(planner.tipoMontaje(e));
-    const serie = () => ({
-      peso: conPeso ? Math.max(0, Number(e.pesoSugerido) || 0) : 0,
-      repeticiones: segs ? null : reps ? reps[1] : REPS_CASI_FALLO,
-      segundos: segs ? segs[1] : null,
+    const peso = conPeso ? Math.max(0, Number(e.pesoSugerido) || 0) : 0;
+    const previo = (segs || reps) ? ultimaVez(sesiones, e.ejercicioId) : null;
+    const serie = (_, k) => ({
+      peso,
+      repeticiones: segs ? null : reps ? valorInicial(e, k, peso, 'repeticiones', reps, previo) : REPS_CASI_FALLO,
+      segundos: segs ? valorInicial(e, k, peso, 'segundos', segs, previo) : null,
       hecha: false,
       hechaEn: null,
     });
@@ -333,7 +378,12 @@ export function editarSerie(sesion, ejercicio, serie, cambios = {}, { propagar =
       // Desmarcar una serie anterior a la actual: se vuelve a ella.
       const pasos = ordenPasos(nueva);
       const k = pasos.findIndex((p) => p.ejercicio === ejercicio && p.serie === serie);
-      if (!actual || k < actual.indice) nueva.posicion = { ejercicio, serie };
+      if (!actual || k < actual.indice) {
+        nueva.posicion = { ejercicio, serie };
+        // El cronómetro libre era de otra serie: ya no es la actual.
+        const cl = nueva.cronoLibre;
+        if (cl && (cl.ejercicio !== ejercicio || cl.serie !== serie)) nueva.cronoLibre = null;
+      }
     }
   }
   return nueva;
@@ -370,6 +420,26 @@ export function ponerCronoLibre(sesion, paso) {
 
 export function terminar(sesion, ahora = Date.now()) {
   return { ...clonar(sesion), terminada: true, fin: new Date(aMs(ahora)).toISOString(), cronoLibre: null };
+}
+
+/* ---------- Ejercicios de la sesión (revisar y corregir) ---------- */
+
+/**
+ * Ejercicios con alguna serie hecha, salvo el actual (sus series ya se editan en pantalla), en el
+ * orden de la sesión -> [{ ejercicio, ejercicioId, hechas, total, saltado }].
+ */
+export function ejerciciosParaRevisar(sesion) {
+  if (!sesion || !Array.isArray(sesion.ejercicios)) return [];
+  const actual = pasoActual(sesion);
+  return sesion.ejercicios
+    .map((item, i) => ({
+      ejercicio: i,
+      ejercicioId: item.ejercicioId,
+      hechas: item.series.filter((s) => s.hecha).length,
+      total: item.series.length,
+      saltado: item.saltado === true,
+    }))
+    .filter((e) => e.hechas > 0 && (!actual || e.ejercicio !== actual.ejercicio));
 }
 
 /* ---------- Validación y valores sugeridos ---------- */
